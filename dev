@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local dev helper: ./dev up | ./dev down
+# One command for the local Supabase, API, and Expo development stack.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -11,19 +11,25 @@ fi
 
 case "${1:-}" in
   up)
-    if [ ! -f apps/api/.env ]; then
-      cp apps/api/.env.example apps/api/.env
-      echo "Created apps/api/.env — add SUPABASE_SERVICE_ROLE_KEY and GEMINI_API_KEY, then re-run './dev up'."
-      echo "(Keys: run '${SUPABASE[*]} start' once, then '${SUPABASE[*]} status'.)"
-    fi
+    command -v docker >/dev/null || { echo "Docker is required." >&2; exit 1; }
+    command -v node >/dev/null || { echo "Node.js is required." >&2; exit 1; }
+    command -v npm >/dev/null || { echo "npm is required." >&2; exit 1; }
+    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 22 && minor >= 13) || (major >= 24 && major % 2 === 0 && (major > 24 || minor >= 3)))) { console.error("Expo SDK 57 needs Node.js 22.13+ or 24.3+ (LTS). Current: " + process.version); process.exit(1); }'
+    docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry ./dev up." >&2; exit 1; }
     "${SUPABASE[@]}" start
+    "${SUPABASE[@]}" status -o json | node scripts/configure-local.mjs
     docker compose up --build -d
-    echo
-    echo "API:      http://localhost:8000  (docs: http://localhost:8000/docs)"
-    echo "Supabase: run '${SUPABASE[*]} status' for URLs and keys"
-    echo "Mobile:   cd apps/mobile && npx expo start"
+
+    if [ ! -f apps/mobile/node_modules/.package-lock.json ]; then
+      npm ci --prefix apps/mobile
+    fi
+    node scripts/expo-process.mjs start
+    echo "API: http://localhost:8000/docs"
+    echo "Expo: http://localhost:8081 (logs: .dev/expo.log)"
+    echo "Use ./dev down to stop everything."
     ;;
   down)
+    node scripts/expo-process.mjs stop
     docker compose down
     "${SUPABASE[@]}" stop
     ;;

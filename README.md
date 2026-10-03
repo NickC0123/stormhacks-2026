@@ -10,7 +10,7 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 | Backend | Python, FastAPI, Pydantic |
 | Database / Auth / Storage | Supabase (Postgres, Auth, Storage) |
 | Receipt parsing | Gemini vision API |
-| Local dev | Docker Compose (API) + Supabase CLI (database stack) |
+| Local dev | `./dev up` / `./dev down` (Supabase, API, Expo) |
 
 ## Repository layout
 
@@ -45,7 +45,7 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 │   ├── config.toml              local Supabase stack (incl. receipts/memories buckets)
 │   ├── migrations/              SQL migrations
 │   └── seed.sql
-├── dev                          `./dev up` / `./dev down`
+├── dev                          start/stop Supabase, API, and Expo
 ├── SETUP.md                     step-by-step setup guide
 └── docker-compose.yml
 ```
@@ -54,23 +54,14 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 
 > New to the repo? Follow the step-by-step guide in [SETUP.md](SETUP.md). The summary below is the short version.
 
-Prerequisites: Node 20+, Docker, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and Expo Go or a simulator.
+Prerequisites: Node 22.13+ or 24.3+ (LTS), Docker, and Expo Go or a simulator. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) is optional; the script uses `npx supabase` when it is not installed.
 
-1. **Backend (Supabase + API)** — one command from the repo root:
+1. **Start everything** — one command from the repo root:
    ```sh
-   ./dev up      # supabase start + docker compose up --build -d
-   ./dev down    # docker compose down + supabase stop
+   ./dev up      # starts Supabase, FastAPI, and Expo
+   ./dev down    # stops all three
    ```
-   The first `./dev up` creates `apps/api/.env` from the example. Fill in `SUPABASE_SERVICE_ROLE_KEY` (from `supabase status`) and `GEMINI_API_KEY`, then run it again. API docs at http://localhost:8000/docs.
-   To apply migrations and seed data: `supabase db reset`.
-2. **Mobile**:
-   ```sh
-   cd apps/mobile
-   cp .env.example .env.local               # fill in the anon key
-   npm install
-   npx expo start
-   ```
-   On a physical device, set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_SUPABASE_URL` to your machine's LAN IP.
+   The script installs mobile dependencies on first run, writes local Supabase keys into ignored env files, and uses your LAN IP for phone access. Set `DEV_HOST=<your LAN IP>` if it detects the wrong interface. API docs are at http://localhost:8000/docs; Expo logs are in `.dev/expo.log`. Add `GEMINI_API_KEY` to `apps/api/.env` only when you need receipt scanning. Migrations run during the initial Supabase start; `supabase db reset` reapplies them and seed data.
 
 ## Checks
 
