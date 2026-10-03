@@ -51,7 +51,7 @@ curl http://localhost:8000/api/v1/health
 # {"status":"ok"}
 ```
 
-Most other endpoints currently return `501 Not Implemented`. That is expected until they are built. The script prints an `exp://` URL for Expo Go. Expo startup output is in `.dev/expo.log`.
+Most other endpoints currently return `501 Not Implemented`. That is expected until they are built. The script prints a QR code and an `exp://` URL for Expo Go after the mobile server is ready. Scan it with Expo Go on Android or the Camera app on iOS. Expo startup output is in `.dev/expo.log`.
 
 ### Using a physical phone
 

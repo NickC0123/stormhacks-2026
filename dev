@@ -27,10 +27,11 @@ case "${1:-}" in
     "${SUPABASE[@]}" status -o json | node scripts/configure-local.mjs
     docker compose up --build -d
 
-    if [ ! -f apps/mobile/node_modules/.package-lock.json ]; then
+    if [ ! -f apps/mobile/node_modules/.package-lock.json ] || ! node -e 'require.resolve("qrcode-terminal", { paths: ["./apps/mobile"] })' >/dev/null 2>&1; then
       npm ci --prefix apps/mobile
     fi
     node scripts/expo-process.mjs start
+    node scripts/expo-qr.mjs
     echo "API: http://localhost:8000/docs"
     echo "Expo: http://localhost:8081 (logs: .dev/expo.log)"
     echo "Use ./dev down to stop everything."
