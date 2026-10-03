@@ -46,10 +46,13 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 │   ├── migrations/              SQL migrations
 │   └── seed.sql
 ├── dev                          `./dev up` / `./dev down`
+├── SETUP.md                     step-by-step setup guide
 └── docker-compose.yml
 ```
 
 ## Getting started
+
+> New to the repo? Follow the step-by-step guide in [SETUP.md](SETUP.md). The summary below is the short version.
 
 Prerequisites: Node 20+, Docker, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and Expo Go or a simulator.
 
