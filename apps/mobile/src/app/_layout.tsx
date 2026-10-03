@@ -8,6 +8,10 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="events/new" options={{ presentation: 'modal', headerShown: true, title: 'New plan' }} />
+        <Stack.Screen
+          name="events/[eventId]/receipts/scan"
+          options={{ headerShown: true, title: 'Add receipt', headerBackTitle: 'Back' }}
+        />
       </Stack>
       <StatusBar style="auto" />
     </>
