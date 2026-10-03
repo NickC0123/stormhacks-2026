@@ -36,7 +36,7 @@ All commands below run from the repo root unless a step says otherwise.
 ./dev up
 ```
 
-The first run downloads Docker images and installs mobile packages, so it may take a few minutes. The script reads local Supabase keys, creates ignored env files, builds the API container, and starts Expo in the background. Database migrations apply on the first Supabase start. To reset the database and apply the seed again, run `supabase db reset` (or `npx supabase db reset` if the CLI is not installed).
+The first run downloads Docker images and installs mobile packages, so it may take a few minutes. The script reads local Supabase keys, creates ignored env files, builds the API container, and starts Expo in the background. It starts the Supabase services used by the app (database, auth, storage, REST) and skips optional analytics, Studio, and edge services to save resources. Database migrations apply on the first Supabase start. To reset the database and apply the seed again, run `supabase db reset` (or `npx supabase db reset` if the CLI is not installed).
 
 For receipt scanning, add your Gemini key to `GEMINI_API_KEY` in `apps/api/.env`, then run `./dev up` again. Other features do not need it.
 

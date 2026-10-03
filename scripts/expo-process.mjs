@@ -28,7 +28,7 @@ if (process.argv[2] === 'start') {
     cwd: resolve('.'),
     detached: true,
     stdio: ['ignore', log, log],
-    env: { ...process.env, CI: '1', EXPO_NO_TELEMETRY: '1' },
+    env: { ...process.env, EXPO_NO_TELEMETRY: '1' },
   });
   child.on('error', (error) => {
     console.error(`Could not start Expo: ${error.message}`);

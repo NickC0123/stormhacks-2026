@@ -16,7 +16,14 @@ case "${1:-}" in
     command -v npm >/dev/null || { echo "npm is required." >&2; exit 1; }
     node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 22 && minor >= 13) || (major >= 24 && major % 2 === 0 && (major > 24 || minor >= 3)))) { console.error("Expo SDK 57 needs Node.js 22.13+ or 24.3+ (LTS). Current: " + process.version); process.exit(1); }'
     docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry ./dev up." >&2; exit 1; }
-    "${SUPABASE[@]}" start
+    # The app uses database, auth, storage, and REST. Skip optional local services
+    # to keep startup fast and reduce Docker memory/disk use on hackathon laptops.
+    mkdir -p .dev
+    echo "Starting Supabase..."
+    if ! "${SUPABASE[@]}" start -x "${SUPABASE_EXCLUDE:-logflare,vector,postgres-meta,studio,edge-runtime}" >.dev/supabase-start.log 2>&1; then
+      echo "Supabase failed to start. See .dev/supabase-start.log." >&2
+      exit 1
+    fi
     "${SUPABASE[@]}" status -o json | node scripts/configure-local.mjs
     docker compose up --build -d
 
