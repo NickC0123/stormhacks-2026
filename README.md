@@ -56,18 +56,48 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 
 Prerequisites: Node 22.13+ or 24.3+ (LTS), Docker, and Expo Go or a simulator. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) is optional; the script uses `npx supabase` when it is not installed.
 
-1. **Start everything** — one command from the repo root:
-   ```sh
-   ./dev up      # starts Supabase, FastAPI, and Expo
-   ./dev down    # stops all three
-   ```
-   The script installs mobile dependencies on first run, writes local Supabase keys into ignored env files, and uses your LAN IP for phone access. Set `DEV_HOST=<your LAN IP>` if it detects the wrong interface. API docs are at http://localhost:8000/docs; Expo logs are in `.dev/expo.log`. Add `GEMINI_API_KEY` to `apps/api/.env` only when you need receipt scanning. Migrations run during the initial Supabase start; `supabase db reset` reapplies them and seed data.
+### First run for teammates
+
+Open Docker Desktop and wait for it to be running, then:
+
+```sh
+git clone https://github.com/NickC0123/stormhacks-2026.git
+cd stormhacks-2026
+./dev up
+```
+
+If you already cloned the repo, run `git pull` before `./dev up`. On Windows, use Git Bash or WSL for the `dev` script.
+
+The script starts Supabase and the FastAPI Docker container, installs mobile dependencies when needed, and starts Expo in the background. It creates ignored local env files and fills in your local Supabase keys automatically. The first run downloads Docker images and can take several minutes.
+
+### Open the app
+
+Once Expo is ready, `./dev up` prints an **Expo Go QR code** in the terminal. Keep your phone and computer on the same Wi-Fi, then scan with Expo Go on Android or the Camera app on iOS. Each teammate's QR code points to their own computer.
+
+If the detected network address is wrong, restart with your computer's LAN IP:
+
+```sh
+./dev down
+DEV_HOST=192.168.1.20 ./dev up  # replace with your own LAN IP
+```
+
+API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). The health endpoint at [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health) returns `{"status":"ok"}`. Expo output is saved in `.dev/expo.log`; Supabase startup output is in `.dev/supabase-start.log`.
+
+The app currently has placeholder screens, and most feature API endpoints return `501 Not Implemented`. Local startup skips optional Supabase Studio, analytics, and edge services to save resources.
+
+### Stop and configure
+
+```sh
+./dev down  # stops Expo, FastAPI, and Supabase; keeps database data
+```
+
+Add `GEMINI_API_KEY` to `apps/api/.env` when you need receipt scanning, then rerun `./dev up`. Keep env files and local keys out of Git. Migrations run during the initial Supabase start; `npx supabase db reset` reapplies migrations and seed data and wipes local database changes.
 
 ## Checks
 
 ```sh
 # mobile
-cd apps/mobile && npm run typecheck
+cd apps/mobile && npm run lint && npm run typecheck
 
 # api (in a venv: pip install -r requirements-dev.txt)
 cd apps/api && ruff check . && pytest
