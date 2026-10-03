@@ -1,0 +1,13 @@
+# Local development. Supabase runs separately via the Supabase CLI (`supabase start`),
+# which manages its own containers; the API reaches it through host.docker.internal.
+services:
+  api:
+    build: ./apps/api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file: ./apps/api/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
