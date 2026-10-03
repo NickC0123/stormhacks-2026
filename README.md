@@ -45,6 +45,7 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 │   ├── config.toml              local Supabase stack (incl. receipts/memories buckets)
 │   ├── migrations/              SQL migrations
 │   └── seed.sql
+├── dev                          `./dev up` / `./dev down`
 └── docker-compose.yml
 ```
 
@@ -52,19 +53,14 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 
 Prerequisites: Node 20+, Docker, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and Expo Go or a simulator.
 
-1. **Supabase** (from the repo root):
+1. **Backend (Supabase + API)** — one command from the repo root:
    ```sh
-   supabase start        # starts Postgres, Auth, Storage in Docker
-   supabase db reset     # applies migrations + seed.sql
-   supabase status       # prints the API URL, anon key and service-role key
+   ./dev up      # supabase start + docker compose up --build -d
+   ./dev down    # docker compose down + supabase stop
    ```
-2. **API**:
-   ```sh
-   cp apps/api/.env.example apps/api/.env   # fill in the service-role key and GEMINI_API_KEY
-   docker compose up --build
-   ```
-   Docs at http://localhost:8000/docs.
-3. **Mobile**:
+   The first `./dev up` creates `apps/api/.env` from the example. Fill in `SUPABASE_SERVICE_ROLE_KEY` (from `supabase status`) and `GEMINI_API_KEY`, then run it again. API docs at http://localhost:8000/docs.
+   To apply migrations and seed data: `supabase db reset`.
+2. **Mobile**:
    ```sh
    cd apps/mobile
    cp .env.example .env.local               # fill in the anon key
