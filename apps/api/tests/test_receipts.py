@@ -4,8 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1.routes import receipts as receipts_route
-from app.core import auth
-from app.core.config import Settings
+from app.core.auth import CurrentUser, get_current_user
 from app.main import app
 from app.services.receipt_parser import (
     ReceiptParseError,
@@ -14,6 +13,14 @@ from app.services.receipt_parser import (
 )
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def signed_in_user():
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user")
+    yield
+    app.dependency_overrides.clear()
+
 
 GEMINI_JSON = {
     "merchant": "Sample Cafe",
@@ -99,8 +106,8 @@ def test_scan_without_gemini_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert scan().status_code == 503
 
 
-def test_scan_requires_token_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(auth, "get_settings", lambda: Settings(environment="production"))
+def test_scan_requires_token() -> None:
+    app.dependency_overrides.clear()
     assert scan().status_code == 401
 
 

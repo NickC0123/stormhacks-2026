@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.auth import CurrentUserDep, CurrentUserOrDevDep
+from app.core.auth import CurrentUserDep
 from app.schemas.receipt import ParsedReceipt, Receipt
 from app.schemas.split import SplitRequest
 from app.services.receipt_parser import (
@@ -34,7 +34,7 @@ def detect_image_type(data: bytes) -> str | None:
 
 
 @router.post("/receipts/scan", response_model=ParsedReceipt)
-async def scan_receipt(file: UploadFile, user: CurrentUserOrDevDep) -> ParsedReceipt:
+async def scan_receipt(file: UploadFile, user: CurrentUserDep) -> ParsedReceipt:
     """Parse a receipt image with Gemini and return items for the user to review."""
     data = await file.read(MAX_IMAGE_BYTES + 1)
     if not data:
