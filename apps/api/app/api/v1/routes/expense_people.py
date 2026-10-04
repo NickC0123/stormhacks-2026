@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
+from postgrest.exceptions import APIError
 
 from app.core.auth import CurrentUserDep
 from app.schemas.invite import (
@@ -13,8 +14,9 @@ from app.schemas.invite import (
     PersonAdded,
 )
 from app.services.event_invites import ExpensePeopleRepo, ExpensePeopleRepoDep
+from app.services.expense_splits import expense_split
 from app.services.friends import FriendsRepoDep
-from app.services.people import add_person, remove_person
+from app.services.people import accepted_friend, add_person, resolve_person
 
 router = APIRouter(tags=["expense people"])
 
@@ -36,13 +38,14 @@ def get_people(
     friends: FriendsRepoDep,
 ) -> ExpensePeople:
     expense = require_member(repo, str(expense_id), user.id)
-    members = list(dict.fromkeys([expense["created_by"], *repo.list_member_ids(str(expense_id))]))
+    members = repo.list_member_ids(str(expense_id))
     invites = repo.list_resource_invites(str(expense_id))
-    ids = set(members)
+    ids = {*members, expense["created_by"]}
     for invite in invites:
         ids.update((invite["invitee_id"], invite["inviter_id"]))
     profiles = {p["id"]: p for p in friends.get_profiles(list(ids))}
     return ExpensePeople(
+        split=expense_split(expense, members, profiles),
         created_by=expense["created_by"],
         members=[EventUser.lookup(profiles, member_id) for member_id in members],
         invites=[
@@ -70,8 +73,17 @@ def add_expense_person(
     friends: FriendsRepoDep,
 ) -> PersonAdded:
     expense = require_member(repo, str(expense_id), user.id)
-    target = add_person(expense["id"], body, user.id, repo, friends)
-    return target
+    target = resolve_person(body, friends)
+    if target["id"] == expense["created_by"]:
+        if repo.is_member(expense["id"], target["id"]):
+            raise HTTPException(409, "The payer is already included in the split.")
+        if user.id != expense["created_by"]:
+            raise HTTPException(403, "Only the payer can include themselves in the split.")
+        repo.add_member(expense["id"], user.id)
+        return PersonAdded(
+            status="added", user=EventUser(id=user.id, username=target.get("username"))
+        )
+    return add_person(expense["id"], body, user.id, repo, friends)
 
 
 @router.delete("/expenses/{expense_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -83,7 +95,21 @@ def remove_expense_person(
     friends: FriendsRepoDep,
 ) -> Response:
     expense = require_member(repo, str(expense_id), user.id)
-    remove_person(expense, str(member_id), user.id, repo, friends)
+    target_id = str(member_id)
+    if not repo.is_member(expense["id"], target_id):
+        raise HTTPException(404, "Member not found.")
+    if target_id == expense["created_by"] and user.id != expense["created_by"]:
+        raise HTTPException(403, "Only the payer can exclude themselves from the split.")
+    if user.id != expense["created_by"] and not accepted_friend(friends, user.id, target_id):
+        raise HTTPException(403, "You can only remove your accepted friends.")
+    if len(repo.list_member_ids(expense["id"])) <= 1:
+        raise HTTPException(400, "An expense needs at least one person in its split.")
+    try:
+        repo.remove_member(expense["id"], target_id)
+    except APIError as exc:
+        if exc.code == "23514":
+            raise HTTPException(400, "An expense needs at least one person in its split.") from exc
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -40,6 +40,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     title: '', description: null, date: localDate(), time: null, currency: 'CAD', amount: '',
     event_id: initialEventId === 'test' ? null : initialEventId ?? null, items: [], parsed_receipt: null,
   });
+  const [splitVersion, setSplitVersion] = useState(0);
   const [savedId, setSavedId] = useState(expenseId);
   const [events, setEvents] = useState<ExpenseEvent[]>([]);
   const [eventError, setEventError] = useState('');
@@ -140,6 +141,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
       }, currentId);
       currentId = expense.id;
       setSavedId(currentId);
+      setSplitVersion((version) => version + 1);
       saved = true;
       if (asset) {
         await attachExpenseReceipt(currentId, asset);
@@ -202,8 +204,11 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             style={[styles.choice, (form.event_id ?? '') === event.id && styles.selected]}
           ><Text style={styles.text}>{event.title}</Text></Pressable>)}
         </View>
-        <Text style={styles.heading}>People</Text>
-        {savedId ? <PeopleManager kind="expense" id={savedId} /> : <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>}
+        <Text style={styles.heading}>Equal split</Text>
+        <Text style={styles.hint}>{form.event_id
+          ? 'Event members are selected by default when you save. You can change the people for this expense.'
+          : 'Select the people sharing this expense after saving.'} Saving expense changes updates the shares.</Text>
+        {savedId ? <PeopleManager key={`${savedId}:${splitVersion}`} kind="expense" id={savedId} /> : <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>}
         <Text style={styles.heading}>Items (optional)</Text>
         {form.items.map((item, index) => <View key={item.id ?? index} style={styles.item}>
           <Field label={`Item ${index + 1} name`} value={item.name} onChangeText={(name) => editItem(index, { name })} styles={styles} editable={!busy} />

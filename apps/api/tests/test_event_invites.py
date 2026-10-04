@@ -31,14 +31,14 @@ class FakePeopleRepo(PeopleRepo):
         self.resources[resource_id] = {
             "id": resource_id,
             "title": "Trip",
+            "amount": "90.00",
+            "currency": "CAD",
             "description": None,
             "starts_at": None,
             "created_by": owner,
             "created_at": datetime.now(UTC).isoformat(),
         }
-        # An expense creator is an implicit member; events persist their creator as a member.
-        if self.resource_key == "event_id":
-            self.members.append((resource_id, owner))
+        self.members.append((resource_id, owner))
         return resource_id
 
     def get_resource(self, resource_id):
@@ -200,7 +200,7 @@ def test_username_lookup_and_duplicate_rules(flow):
     assert res.status_code == 201
     assert res.json()["user"]["id"] == DAVE
     assert flow.add(DAVE).status_code == 409
-    assert flow.add(ALICE).status_code == 400
+    assert flow.add(ALICE).status_code == (400 if flow.kind == "event" else 409)
     assert flow.add(str(uuid.uuid4())).status_code == 404
     assert client.post(flow.base + "/invites", json={"username": "missing"}).status_code == 404
     for body in [{}, {"username": "!"}, {"username": "bob", "user_id": BOB}]:
@@ -223,7 +223,7 @@ def test_decline_cancel_and_permissions(flow):
     invite_id = flow.add(DAVE).json()["invite"]["id"]
     assert client.delete(f"{flow.incoming}/{invite_id}").status_code == 204
     assert flow.repo.invites == {}
-    assert flow.remove(ALICE).status_code == 403
+    assert flow.remove(ALICE).status_code == (403 if flow.kind == "event" else 400)
     assert flow.remove(BOB).status_code == 404
 
 
