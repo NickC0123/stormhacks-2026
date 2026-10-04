@@ -170,7 +170,9 @@ export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props)
             accessibilityLabel="Close photo"
           />
           {viewing ? (
-            <Image source={{ uri: viewing.url }} style={styles.full} resizeMode="contain" pointerEvents="none" />
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Image source={{ uri: viewing.url }} style={styles.full} resizeMode="contain" />
+            </View>
           ) : null}
           {viewingDeletable ? (
             <Pressable

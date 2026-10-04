@@ -61,6 +61,7 @@ function AppNavigator() {
         <Stack.Screen name="archive" options={{ headerShown: true, title: 'Archive', headerBackTitle: 'Back' }} />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="users/[userId]" options={{ headerShown: true, title: 'Profile', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="events/[eventId]/edit" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="events/[eventId]/index" options={{ headerShown: false }} />
         <Stack.Screen
           name="events/[eventId]/invite"

@@ -11,12 +11,12 @@ import { formatCents, toCents, unconvertedNote } from '@/lib/expenses';
 import { useTheme, type Theme } from '@/theme';
 import type { BalanceDashboard } from '@/types';
 
-type Props = { balances: ReturnType<typeof useExpenseBalances> };
+type Props = { balances: ReturnType<typeof useExpenseBalances>; eventOnly?: boolean };
 type Person = BalanceDashboard['people'][number];
 const cents = (amount: string) => toCents(amount) ?? 0;
 const money = (amount: number, currency: string) => `$${formatCents(Math.abs(amount))} ${currency}`;
 
-export function ExpenseBalanceDashboard({ balances }: Props) {
+export function ExpenseBalanceDashboard({ balances, eventOnly = false }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
   const [tab, setTab] = useState<'owed' | 'owing' | 'settled'>('owed');
@@ -31,7 +31,8 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
   const people = tab === 'owed' ? owed.sort(largestFirst('owed_to_you')) : tab === 'owing' ? owing.sort(largestFirst('you_owe')) : settled;
 
   return <View style={styles.section}>
-    <Text accessibilityRole="header" style={styles.heading}>Your balance</Text>
+    <Text accessibilityRole="header" style={styles.heading}>{eventOnly ? 'Your event balance' : 'Your balance'}</Text>
+    {eventOnly ? <Text style={styles.caption}>Expenses and recorded payments for this event only.</Text> : null}
     {loading || error ? <LoadState loading={loading} error={error} fallbackError="Could not load balances." onRetry={retry} /> : null}
     {data ? <>
       {(data.totals.length ? data.totals : [{ currency: 'CAD', you_owe: '0.00', owed_to_you: '0.00' }]).map((total) => <View key={total.currency} style={styles.summary}>

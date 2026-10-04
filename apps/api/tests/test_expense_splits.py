@@ -283,3 +283,43 @@ def test_creditor_e_transfer_contact_is_shown_only_when_visible_and_owed(setup):
     sign_in(BOB)
     settle(ALICE, "30.00")
     assert person(client.get("/api/v1/balances").json(), ALICE)["payment_contacts"] == []
+
+
+def test_event_overview_and_payments_are_scoped_to_one_event(setup):
+    people, expense_id = setup
+    events = FakePeopleRepo("event")
+    event_a = events.add_resource(ALICE)
+    event_b = events.add_resource(ALICE)
+    events.add_member(event_a, BOB)
+    events.add_member(event_b, BOB)
+    app.dependency_overrides[EventInvitesRepo] = lambda: events
+    people.resources[expense_id]["event_id"] = event_a
+    second = people.add_resource(ALICE)
+    people.resources[second]["event_id"] = event_b
+    people.add_member(second, BOB)
+    a_url = f"/api/v1/events/{event_a}/balances"
+    b_url = f"/api/v1/events/{event_b}/balances"
+    a = client.get(a_url).json()
+    b = client.get(b_url).json()
+    assert a["totals"][0]["owed_to_you"] == "60.00"
+    assert b["totals"][0]["owed_to_you"] == "45.00"
+    assert {expense["expense_id"] for person in a["people"] for expense in person["expenses"]} == {
+        expense_id,
+    }
+    response = client.post(
+        "/api/v1/settlements",
+        json={
+            "user_id": BOB,
+            "amount": "30.00",
+            "event_id": event_a,
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["totals"][0]["owed_to_you"] == "30.00"
+    assert client.get(b_url).json() == b
+    assert total()["owed_to_you"] == "75.00"
+    sign_in(BOB)
+    assert client.get(a_url).json()["totals"][0]["you_owe"] == "0.00"
+    assert client.get(b_url).json()["totals"][0]["you_owe"] == "45.00"
+    sign_in(DAVE)
+    assert client.get(a_url).status_code == 404

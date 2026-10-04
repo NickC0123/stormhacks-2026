@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, status
@@ -63,6 +64,7 @@ def list_expenses(
     event_id: UUID | None = None,
     limit: int = Query(default=100, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    order: Literal["asc", "desc"] = "desc",
 ) -> list[Expense]:
     db = get_supabase()
     query = db.table("expenses").select("*")
@@ -80,8 +82,9 @@ def list_expenses(
         else:
             query = query.eq("created_by", user.id)
     rows = (
-        query.order("date", desc=True)
-        .order("created_at", desc=True)
+        query.order("date", desc=order == "desc")
+        .order("created_at", desc=order == "desc")
+        .order("id", desc=order == "desc")
         .range(offset, offset + limit - 1)
         .execute()
         .data

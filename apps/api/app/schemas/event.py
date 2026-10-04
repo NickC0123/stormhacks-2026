@@ -14,6 +14,14 @@ class EventCreate(BaseModel):
     member_ids: list[UUID] = []
 
 
+class EventUpdate(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    starts_at: datetime | None = None
+
+
 class Event(EventCreate):
     id: UUID
     created_by: UUID

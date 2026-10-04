@@ -16,6 +16,10 @@ export function getEvent(eventId: string): Promise<EventDetail> {
   return apiFetch<EventDetail>(`/events/${eventId}`);
 }
 
+export function updateEvent(eventId: string, body: Pick<EventDetail, 'title' | 'description' | 'starts_at'>): Promise<EventDetail> {
+  return apiFetch<EventDetail>(`/events/${eventId}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
 /** Host only. Deletes the event with its expenses, photos and payments. */
 export function deleteEvent(eventId: string): Promise<void> {
   return apiFetch<void>(`/events/${eventId}`, { method: 'DELETE' });

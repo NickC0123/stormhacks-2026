@@ -6,6 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EventActionModal } from '@/components/events/EventActionModal';
 import { EventExpenses } from '@/components/events/EventExpenses';
 import { EventPhotos } from '@/components/events/EventPhotos';
+import { ExpenseBalanceDashboard } from '@/components/expenses/ExpenseBalanceDashboard';
+import { Button } from '@/components/ui/Button';
+import { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { AvatarStack } from '@/components/ui/AvatarStack';
 import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { LoadState } from '@/components/ui/LoadState';
@@ -18,10 +21,11 @@ import { deleteEvent, formatEventDate, getEvent } from '@/lib/events';
 import { useProfile } from '@/lib/profile';
 import { useTheme, type Theme } from '@/theme';
 
-type EventTab = 'photos' | 'expenses';
+type EventTab = 'photos' | 'expenses' | 'overview';
 
 const EVENT_TABS: { value: EventTab; label: string }[] = [
   { value: 'photos', label: 'Photos' },
+  { value: 'overview', label: 'Overview' },
   { value: 'expenses', label: 'Expenses' },
 ];
 
@@ -37,6 +41,11 @@ function openManagePeople(eventId: string) {
   router.push({ pathname: '/events/[eventId]/invite', params: { eventId } });
 }
 
+function EventOverview({ eventId }: { eventId: string }) {
+  const balances = useExpenseBalances(eventId);
+  return <ExpenseBalanceDashboard balances={balances} eventOnly />;
+}
+
 export default function EventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const { profile } = useProfile();
@@ -45,6 +54,7 @@ export default function EventScreen() {
   const styles = createStyles(theme);
   const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState<EventTab>('photos');
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [photoPickRequest, setPhotoPickRequest] = useState(0);
   const [deleting, setDeleting] = useState(false);
@@ -99,7 +109,7 @@ export default function EventScreen() {
         title={event.title}
         description={date || undefined}
         detail={event.description?.trim() || undefined}
-        onRefresh={refresh}
+        onRefresh={() => { setRefreshVersion((version) => version + 1); void refresh(); }}
         refreshing={refreshing}
         headerLeft={<EventBackButton />}
         headerRight={
@@ -118,6 +128,7 @@ export default function EventScreen() {
       >
         <View style={styles.content}>
           {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+          <View style={styles.peopleRow}>
           <AvatarStack
             people={event.members.map((member) => ({
               id: member.id,
@@ -127,6 +138,8 @@ export default function EventScreen() {
             onPress={() => openManagePeople(eventId)}
             accessibilityLabel="Manage people"
           />
+          {isHost ? <Button label="Edit event" size="sm" variant="secondary" onPress={() => router.push({ pathname: '/events/[eventId]/edit', params: { eventId } })} /> : null}
+          </View>
 
           <View style={styles.tabSection}>
             <Tabs
@@ -144,7 +157,8 @@ export default function EventScreen() {
                   pickRequest={photoPickRequest}
                 />
               </View>
-              {tab === 'expenses' ? <EventExpenses eventId={eventId} /> : null}
+              {tab === 'overview' ? <EventOverview key={`${eventId}:${refreshVersion}`} eventId={eventId} /> : null}
+              {tab === 'expenses' ? <EventExpenses eventId={eventId} refreshVersion={refreshVersion} /> : null}
             </View>
           </View>
         </View>
@@ -190,6 +204,7 @@ function createStyles(theme: Theme) {
       marginTop: theme.spacing[3],
       gap: theme.spacing[8],
     },
+    peopleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing[3], flexWrap: 'wrap' },
     tabSection: {
       gap: theme.spacing[4],
     },

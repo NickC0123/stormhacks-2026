@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.auth import CurrentUserDep
 from app.core.config import get_settings
 from app.db.supabase import get_supabase
-from app.schemas.event import Event, EventCreate, EventHomeItem
+from app.schemas.event import Event, EventCreate, EventHomeItem, EventUpdate
 from app.schemas.invite import EventDetail, EventInvite, EventUser
 from app.schemas.photo import EventPhotoPreview
 from app.services.event_invites import EventInvitesRepo, EventInvitesRepoDep
@@ -63,7 +63,11 @@ def list_events(
         return []
 
     member_rows = (
-        db.table("event_members").select("event_id,user_id").in_("event_id", event_ids).execute().data
+        db.table("event_members")
+        .select("event_id,user_id")
+        .in_("event_id", event_ids)
+        .execute()
+        .data
     )
     members_by_event: dict[str, list[str]] = {event_id: [] for event_id in event_ids}
     profile_ids: set[str] = set()
@@ -116,19 +120,22 @@ def create_event(body: EventCreate, user: CurrentUserDep) -> Event:
         ignore_duplicates=True,
     ).execute()
 
-    created = db.table("events").insert(
-        {
-            "title": title,
-            "description": body.description,
-            "starts_at": body.starts_at.isoformat() if body.starts_at else None,
-            "created_by": user.id,
-        }
-    ).execute().data[0]
+    created = (
+        db.table("events")
+        .insert(
+            {
+                "title": title,
+                "description": body.description,
+                "starts_at": body.starts_at.isoformat() if body.starts_at else None,
+                "created_by": user.id,
+            }
+        )
+        .execute()
+        .data[0]
+    )
 
     try:
-        db.table("event_members").insert(
-            {"event_id": created["id"], "user_id": user.id}
-        ).execute()
+        db.table("event_members").insert({"event_id": created["id"], "user_id": user.id}).execute()
     except Exception:
         db.table("events").delete().eq("id", created["id"]).execute()
         raise
@@ -169,6 +176,28 @@ def get_event(
             for invite in invites
         ],
     )
+
+
+@router.put("/{event_id}", response_model=EventDetail)
+def update_event(
+    event_id: UUID,
+    body: EventUpdate,
+    user: CurrentUserDep,
+    repo: EventInvitesRepoDep,
+    friends: FriendsRepoDep,
+) -> EventDetail:
+    """Edit event details. Membership, expenses and photos are preserved."""
+    event = get_member_event(repo, event_id, user.id)
+    if event["created_by"] != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the event's host can edit it.")
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Event title cannot be blank.")
+    values = body.model_dump(mode="json")
+    values["title"] = title
+    values["description"] = body.description.strip() or None if body.description else None
+    repo.update_event(str(event_id), user.id, values)
+    return get_event(event_id, user, repo, friends)
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)

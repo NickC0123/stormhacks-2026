@@ -25,6 +25,7 @@ class Query:
         self.filters = []
         self.action, self.values = "select", None
         self.page = None
+        self.orders = []
 
     def select(self, *args):
         return self
@@ -46,7 +47,8 @@ class Query:
         )
         return self
 
-    def order(self, *args, **kwargs):
+    def order(self, name, *, desc=False):
+        self.orders.append((name, desc))
         return self
 
     def range(self, start, end):
@@ -79,6 +81,8 @@ class Query:
                 raise RuntimeError("Database write failed")
             for row in rows:
                 row.update(self.values)
+        for name, desc in reversed(self.orders):
+            rows.sort(key=lambda row: row.get(name) or "", reverse=desc)
         if self.page:
             rows = rows[self.page[0] : self.page[1] + 1]
         return SimpleNamespace(data=deepcopy(rows))
@@ -109,9 +113,7 @@ class StubFriendsRepo(FriendsRepo):
         pass
 
     def get_profiles(self, user_ids):
-        return [
-            {"id": user_id, "username": "user", "avatar_color": "blue"} for user_id in user_ids
-        ]
+        return [{"id": user_id, "username": "user", "avatar_color": "blue"} for user_id in user_ids]
 
 
 @pytest.fixture
@@ -412,7 +414,33 @@ def test_participants_can_read_expenses_and_receipts_but_cannot_edit(db, body, m
 
 
 def test_joined_expenses_keep_event_filter_and_do_not_duplicate_owned_expenses(db, body):
+    db.rows["events"].append({"id": EVENT, "created_by": USER})
     expense = create(body).json()
     db.rows["expense_members"].append({"expense_id": expense["id"], "user_id": USER})
     assert len(client.get("/api/v1/expenses").json()) == 1
     assert client.get(f"/api/v1/expenses?event_id={EVENT}").json() == []
+
+
+@pytest.mark.parametrize(
+    "order,expected",
+    [
+        ("asc", ["2026-10-01", "2026-10-02", "2026-10-03"]),
+        ("desc", ["2026-10-03", "2026-10-02", "2026-10-01"]),
+    ],
+)
+def test_event_date_order_applies_before_pagination(db, body, order, expected):
+    db.rows["events"].append({"id": EVENT, "created_by": USER})
+    body["event_id"] = EVENT
+    for date in ["2026-10-02", "2026-10-03", "2026-10-01"]:
+        body["date"] = date
+        assert create(body).status_code == 201
+    base = f"/api/v1/expenses?event_id={EVENT}&order={order}"
+    result = client.get(base)
+    assert result.status_code == 200
+    assert [row["date"] for row in result.json()] == expected
+    page = client.get(base + "&limit=1&offset=1").json()
+    assert [row["date"] for row in page] == expected[1:2]
+
+
+def test_expense_invalid_order_rejected(db):
+    assert client.get("/api/v1/expenses?order=invalid").status_code == 422

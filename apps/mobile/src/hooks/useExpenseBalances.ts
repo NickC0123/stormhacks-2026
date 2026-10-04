@@ -6,9 +6,8 @@ import { apiFetch } from '@/lib/api';
 import { settleUp } from '@/lib/expenses';
 import type { BalanceDashboard } from '@/types';
 
-const loadBalances = () => apiFetch<BalanceDashboard>('/balances');
-
-export function useExpenseBalances() {
+export function useExpenseBalances(eventId?: string) {
+  const loadBalances = useCallback(() => apiFetch<BalanceDashboard>(eventId ? `/events/${eventId}/balances` : '/balances'), [eventId]);
   const state = useFocusedData(loadBalances, 'Could not load balances.');
   const { reload } = state;
   useFocusEffect(useCallback(() => {
@@ -19,7 +18,7 @@ export function useExpenseBalances() {
     ...state,
     settle: (userId: string, amount: string, currency: string) => state.run(
       `${userId}:${currency}`,
-      () => settleUp(userId, amount),
+      () => settleUp(userId, amount, eventId),
       'Could not record payment',
       (dashboard) => dashboard,
     ),

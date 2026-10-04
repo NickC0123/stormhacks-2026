@@ -125,7 +125,10 @@ class PeopleRepo:
 
 
 class EventInvitesRepo(PeopleRepo):
-    pass
+    def update_event(self, event_id: str, host_id: str, values: Row) -> None:
+        self.db.table("events").update(values).eq("id", event_id).eq(
+            "created_by", host_id
+        ).execute()
 
 
 class ExpensePeopleRepo(PeopleRepo):

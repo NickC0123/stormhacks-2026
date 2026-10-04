@@ -34,15 +34,15 @@ export function unconvertedNote(currencies: string[]) {
 }
 
 /** Records that the whole balance with `userId` was paid; `amount` is the balance shown. */
-export const settleUp = (userId: string, amount: string) => apiFetch<BalanceDashboard>('/settlements', {
+export const settleUp = (userId: string, amount: string, eventId?: string) => apiFetch<BalanceDashboard>('/settlements', {
   method: 'POST',
-  body: JSON.stringify({ user_id: userId, amount }),
+  body: JSON.stringify({ user_id: userId, amount, ...(eventId ? { event_id: eventId } : {}) }),
 });
 
 export type ExpenseEvent = { id: string; title: string };
 export const listExpenseEvents = () => apiFetch<ExpenseEvent[]>('/events');
-export function listExpenses(offset = 0, eventId?: string) {
-  const params = new URLSearchParams({ offset: String(offset) });
+export function listExpenses(offset = 0, eventId?: string, order: 'asc' | 'desc' = 'desc') {
+  const params = new URLSearchParams({ offset: String(offset), order });
   if (eventId) params.set('event_id', eventId);
   return apiFetch<Expense[]>(`/expenses?${params}`);
 }
