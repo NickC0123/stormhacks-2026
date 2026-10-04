@@ -44,6 +44,18 @@ export function SFSymbolIcon({ name, size, color }: Props) {
     return <Ionicons name="close" size={iconSize} color={tint} />;
   }
 
+  if (name === 'chevron.down') {
+    return <Ionicons name="chevron-down" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'checkmark') {
+    return <Ionicons name="checkmark" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'trash') {
+    return <Ionicons name="trash-outline" size={iconSize} color={tint} />;
+  }
+
   if (name === 'square.and.arrow.up') {
     return <Ionicons name="share-outline" size={iconSize} color={tint} />;
   }

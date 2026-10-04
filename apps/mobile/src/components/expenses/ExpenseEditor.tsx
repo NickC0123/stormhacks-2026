@@ -18,9 +18,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
+import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
 import { attachExpenseReceipt, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
@@ -286,15 +288,20 @@ function createPickerSheetStyles(theme: Theme) {
       color: theme.colors.accentStrong,
     },
     pickerControl: {
+      width: '100%',
       height: theme.sizes.dateTimePicker,
-      alignSelf: 'stretch',
+      alignSelf: 'center',
     },
   });
 }
 
 export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: string; initialEventId?: string }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const { showSnackbar } = useSnackbar();
   const styles = createStyles(theme);
+  // Match floating bottom nav: sit just above the home indicator (min 12).
+  const bottomPad = Math.max(insets.bottom, theme.spacing[3]);
   const [form, setForm] = useState<ExpenseWrite>({
     title: '', description: null, date: localDate(), time: null, currency: 'CAD', amount: '',
     event_id: initialEventId === 'test' ? null : initialEventId ?? null, items: [], parsed_receipt: null,
@@ -313,13 +320,18 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   /** Drawer create flow: details first, receipt/items later. */
   const [step, setStep] = useState<1 | 2>(1);
   const [manualEntry, setManualEntry] = useState(false);
+  const [scanToast, setScanToast] = useState<string | null>(null);
   const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
   const totals = expenseTotal(form);
   const printedTotal = receiptTotalMismatch(totals, form.parsed_receipt);
   const totalSteps = 2;
 
-  function openReceiptPicker() {
+  function openReceiptPicker(options?: { scanAfter?: boolean }) {
     if (busy) return;
+    const afterPick = async (pick: () => Promise<Awaited<ReturnType<typeof takePhoto>>>) => {
+      const next = await pick();
+      if (options?.scanAfter && next) await readReceipt(next);
+    };
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -327,15 +339,15 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           cancelButtonIndex: 0,
         },
         (index) => {
-          if (index === 1) void takePhoto();
-          if (index === 2) void chooseFromLibrary();
+          if (index === 1) void afterPick(takePhoto);
+          if (index === 2) void afterPick(chooseFromLibrary);
         },
       );
       return;
     }
     Alert.alert('Add receipt', 'Capture a new photo or choose one from your library.', [
-      { text: 'Take Photo', onPress: () => void takePhoto() },
-      { text: 'Choose from Library', onPress: () => void chooseFromLibrary() },
+      { text: 'Take Photo', onPress: () => void afterPick(takePhoto) },
+      { text: 'Choose from Library', onPress: () => void afterPick(chooseFromLibrary) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -378,7 +390,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   function startManualEntry() {
     setManualEntry(true);
     if (form.items.length === 0) {
-      field('items', [{ name: '', category: 'other', amount: '', quantity: '1' }]);
+      field('items', [{ name: '', category: 'other', amount: '', quantity: '' }]);
     }
   }
 
@@ -386,20 +398,30 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     setForm((current) => ({ ...current, items: current.items.map((item, i) => i === index ? { ...item, ...patch } : item) }));
   }
 
-  async function readReceipt() {
-    if (!asset || busy) return;
+  async function readReceipt(source = asset) {
+    if (!source || busy) return;
     setBusy(true);
     setError('');
     try {
-      const fields = receiptExpenseFields(await scanReceipt(asset));
-      setForm((current) => ({
-        ...current, ...fields,
-        title: fields.title || current.title,
-        date: fields.date || current.date,
-        time: fields.date ? null : current.time,
-      }));
+      const fields = receiptExpenseFields(await scanReceipt(source));
+      setForm((current) => {
+        // Keep filled rows; drop blank manual placeholders before appending scan results.
+        const existing = current.items.filter(
+          (item) => item.name.trim() || item.amount.trim() || String(item.quantity ?? '').trim() !== '',
+        );
+        return {
+          ...current,
+          ...fields,
+          title: fields.title || current.title,
+          date: fields.date || current.date,
+          time: fields.date ? null : current.time,
+          items: [...existing, ...fields.items],
+        };
+      });
       // Show the parsed line items (drawer hides the item list until manual/scan mode).
       setManualEntry(true);
+      // In-drawer toast — root snackbars sit under the native expense modal.
+      setScanToast('Receipt scanned successfully.');
     } catch (err) {
       setError(messageOf(err));
     } finally {
@@ -408,11 +430,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   }
 
   function requestScan() {
-    if (form.title || form.items.length) {
-      Alert.alert('Use receipt details?', 'This will populate the title, date, currency, items, tax, tip and discount. Review the results before saving.', [
-        { text: 'Cancel', style: 'cancel' }, { text: 'Use receipt details', onPress: readReceipt },
-      ]);
-    } else void readReceipt();
+    void readReceipt();
   }
 
   function validateStep1(): boolean {
@@ -433,6 +451,38 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     setStep(2);
   }
 
+  function hasEnteredItems() {
+    // Empty "Enter manually" rows don't count — only real input or a receipt.
+    const hasFilledItem = form.items.some(
+      (item) => item.name.trim() || item.amount.trim() || String(item.quantity ?? '').trim() !== '',
+    );
+    return hasFilledItem || Boolean(asset) || Boolean(form.parsed_receipt);
+  }
+
+  /** Warn before leaving step 2 / closing when item work would be lost. */
+  function confirmDiscardItems(onDiscard: () => void) {
+    if (!hasEnteredItems()) {
+      onDiscard();
+      return;
+    }
+    Alert.alert(
+      'Discard changes?',
+      'If you leave now, you’ll lose the items you’ve entered.',
+      [
+        { text: 'Keep Editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onDiscard },
+      ],
+    );
+  }
+
+  function discardItemsAndGoToStep1() {
+    field('items', []);
+    field('parsed_receipt', null);
+    setManualEntry(false);
+    clear();
+    setStep(1);
+  }
+
   async function save() {
     if (busy) return;
     if (!validateStep1()) return;
@@ -443,7 +493,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     if (form.items.some((item) => !validQuantity(item.quantity))) {
       setError('Each item quantity must be greater than zero, with up to three decimal places.'); return;
     }
-    if (!totals || totals.total < 0) { setError('The total cannot be negative. Check the item amounts.'); return; }
+    if (!totals || totals.total === 0) { setError('Add at least one item before saving.'); return; }
+    if (totals.total < 0) { setError('The total cannot be negative. Check the item amounts.'); return; }
     setBusy(true);
     setError('');
     let currentId = savedId;
@@ -460,20 +511,15 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         await attachExpenseReceipt(currentId, asset);
         clear();
       }
-      if (expenseId !== currentId) {
-        router.replace({ pathname: '/expenses/[expenseId]', params: { expenseId: currentId } });
-      } else {
-        setHasReceipt(Boolean(asset) || Boolean(expense.receipt_image_path));
-        if (asset) {
-          try {
-            const { url } = await getExpenseReceiptUrl(currentId);
-            setReceiptUrl(url);
-          } catch (err) {
-            setError(`Expense and receipt saved, but the image preview could not load: ${messageOf(err)}`);
-          }
-        }
-        Alert.alert('Expense saved');
-      }
+      const created = !expenseId;
+      router.back();
+      // Wait for the modal dismiss so the toast doesn't play under the closing drawer.
+      setTimeout(() => {
+        showSnackbar({
+          message: created ? 'Expense created successfully.' : 'Expense saved successfully.',
+          variant: 'success',
+        });
+      }, theme.motion.modal.closeDur + theme.motion.duration.fast);
     } catch (err) {
       setError(saved && asset
         ? `Expense saved, but the receipt could not be attached. Tap Save to retry without creating another expense. ${messageOf(err)}`
@@ -491,11 +537,17 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const showStep2 = !isDrawer || step === 2;
   const imageUri = asset?.uri ?? receiptUrl;
   const canContinue = form.title.trim().length > 0;
+  const canSave = Boolean(totals && totals.total !== 0);
 
   return (
-    <SafeAreaView style={styles.container} edges={isDrawer ? ['bottom'] : ['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={isDrawer ? [] : ['left', 'right']}>
       <ScrollView
-        contentContainerStyle={[styles.content, isDrawer && styles.drawerContent]}
+        contentContainerStyle={[
+          styles.content,
+          isDrawer && styles.drawerContent,
+          isDrawer && styles.drawerContentGrow,
+          { paddingBottom: bottomPad },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         {isDrawer ? (
@@ -508,7 +560,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 accessibilityRole="button"
                 accessibilityLabel="Close"
                 hitSlop={theme.spacing[2]}
-                onPress={() => router.back()}
+                onPress={() => confirmDiscardItems(() => router.back())}
                 style={({ pressed }) => [styles.closeButton, pressed && styles.closePressed]}
               >
                 <SFSymbolIcon name="xmark" color={theme.colors.textPrimary} />
@@ -586,15 +638,27 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 ) : null}
               </View>
             </View>
-            <Text style={styles.label}>Event (optional)</Text>
-            {eventError ? <Text style={styles.warning}>Could not load events: {eventError}</Text> : null}
-            {form.event_id && !events.some((event) => event.id === form.event_id) ? <Text style={styles.hint}>An event is selected. Choose an available event or No event.</Text> : null}
-            <View style={styles.choices}>
-              {[{ id: '', title: 'No event' }, ...events].map((event) => <Pressable
-                key={event.id} disabled={busy} onPress={() => field('event_id', event.id || null)}
-                accessibilityRole="radio" accessibilityState={{ selected: (form.event_id ?? '') === event.id }}
-                style={[styles.choice, (form.event_id ?? '') === event.id && styles.selected]}
-              ><Text style={styles.text}>{event.title}</Text></Pressable>)}
+            <View style={styles.field}>
+              <Text style={styles.label}>Event (optional)</Text>
+              {eventError ? <Text style={styles.warning}>Could not load events: {eventError}</Text> : null}
+              {form.event_id && !events.some((event) => event.id === form.event_id) ? (
+                <Text style={styles.hint}>An event is selected. Choose an available event or No event.</Text>
+              ) : null}
+              <NativeSelect
+                value={form.event_id ?? ''}
+                options={[
+                  { value: '', label: 'No event' },
+                  ...events.map((event) => ({ value: event.id, label: event.title })),
+                  ...(form.event_id && !events.some((event) => event.id === form.event_id)
+                    ? [{ value: form.event_id, label: 'Selected event' }]
+                    : []),
+                ]}
+                disabled={busy}
+                placeholder="No event"
+                title="Event"
+                accessibilityLabel="Event"
+                onChange={(eventId) => field('event_id', eventId || null)}
+              />
             </View>
           </>
         ) : null}
@@ -606,135 +670,228 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             <Text style={styles.sectionLabel}>Items</Text>
             {manualEntry || !isDrawer ? (
               <>
-                {form.items.map((item, index) => (
-                  <View key={item.id ?? index} style={styles.item}>
-                    <Field label={`Item ${index + 1} name`} value={item.name} onChangeText={(name) => editItem(index, { name })} styles={styles} editable={!busy} />
-                    <View style={styles.itemRow}>
-                      <View style={styles.quantity}>
-                        <Field
-                          label="Quantity"
-                          accessibilityLabel={`Item ${index + 1} quantity`}
-                          value={String(item.quantity ?? 1)}
-                          onChangeText={(quantity) => editItem(index, { quantity, unit_price: null })}
-                          styles={styles}
+                {form.items.map((item, index) => {
+                  const categoryLabel = categories.find((category) => category.value === item.category)?.label ?? 'Category';
+                  const quantityValue = item.quantity === undefined || item.quantity === null ? '' : String(item.quantity);
+                  return (
+                    <View key={item.id ?? index} style={styles.item}>
+                      <View style={styles.itemHeader}>
+                        <TextInput
+                          accessibilityLabel={`Item ${index + 1} name`}
+                          value={item.name}
+                          onChangeText={(name) => editItem(index, { name })}
                           editable={!busy}
-                          keyboardType="decimal-pad"
+                          placeholder="Enter item name"
+                          placeholderTextColor={theme.colors.textTertiary}
+                          style={styles.itemName}
                         />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove item ${index + 1}`}
+                          disabled={busy}
+                          hitSlop={theme.spacing[2]}
+                          onPress={() => {
+                            const nextItems = form.items.filter((_, i) => i !== index);
+                            field('items', nextItems);
+                            // Last item gone in the drawer → back to receipt dropzone (hides overall amount too).
+                            if (isDrawer && nextItems.length === 0) {
+                              setManualEntry(false);
+                              clear();
+                              field('parsed_receipt', null);
+                            }
+                          }}
+                          style={({ pressed }) => [
+                            styles.itemRemove,
+                            pressed && !busy && styles.itemRemovePressed,
+                            busy && styles.pickerDisabled,
+                          ]}
+                        >
+                          <SFSymbolIcon name="trash" size={theme.sizes.iconMd} color={theme.colors.danger} />
+                        </Pressable>
                       </View>
-                      <View style={styles.amount}>
-                        <Field
-                          label="Item amount"
-                          accessibilityLabel={`Item ${index + 1} amount`}
-                          value={item.amount}
-                          onChangeText={(amount) => editItem(index, { amount, unit_price: null })}
-                          styles={styles}
-                          editable={!busy}
-                          keyboardType="decimal-pad"
+                      <View style={styles.itemBody}>
+                        <View style={styles.itemRow}>
+                          <View style={styles.quantityControl}>
+                            <TextInput
+                              accessibilityLabel={`Item ${index + 1} quantity`}
+                              value={quantityValue}
+                              onChangeText={(quantity) => editItem(index, { quantity, unit_price: null })}
+                              editable={!busy}
+                              keyboardType="decimal-pad"
+                              placeholder="Qty"
+                              placeholderTextColor={theme.colors.textTertiary}
+                              style={styles.quantityInput}
+                            />
+                          </View>
+                          <View style={styles.amountControl}>
+                            <Text
+                              style={[styles.amountPrefix, !item.amount && styles.amountPrefixPlaceholder]}
+                              accessibilityElementsHidden
+                              importantForAccessibility="no"
+                            >
+                              $
+                            </Text>
+                            <TextInput
+                              accessibilityLabel={`Item ${index + 1} amount`}
+                              value={item.amount}
+                              onChangeText={(amount) => editItem(index, { amount, unit_price: null })}
+                              editable={!busy}
+                              keyboardType="decimal-pad"
+                              placeholder="0.00"
+                              placeholderTextColor={theme.colors.textTertiary}
+                              style={styles.amountInput}
+                            />
+                          </View>
+                        </View>
+                        <NativeSelect
+                          value={
+                            item.category === 'other' && !item.name.trim() && !item.amount && !quantityValue
+                              ? null
+                              : item.category
+                          }
+                          options={categories}
+                          disabled={busy}
+                          placeholder="Category"
+                          title="Category"
+                          accessibilityLabel={`Item ${index + 1} category, ${categoryLabel}`}
+                          onChange={(category) => editItem(index, { category })}
+                          triggerStyle={styles.categoryTrigger}
                         />
                       </View>
                     </View>
-                    <Text style={styles.label}>Category</Text>
-                    <View style={styles.choices}>{categories.map(({ value, label }) => <Pressable
-                      key={value} disabled={busy} onPress={() => editItem(index, { category: value })}
-                      accessibilityRole="radio" accessibilityState={{ selected: item.category === value }}
-                      style={[styles.choice, item.category === value && styles.selected]}
-                    ><Text style={styles.text}>{label}</Text></Pressable>)}</View>
-                    <Action label="Remove item" onPress={() => field('items', form.items.filter((_, i) => i !== index))} disabled={busy} styles={styles} />
-                  </View>
-                ))}
-                <Action
-                  label="Add individual item"
+                  );
+                })}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add item"
+                  accessibilityState={{ disabled: busy }}
+                  disabled={busy}
                   onPress={() => {
                     setManualEntry(true);
-                    field('items', [...form.items, { name: '', category: 'other', amount: '', quantity: '1' }]);
+                    field('items', [...form.items, { name: '', category: 'other', amount: '', quantity: '' }]);
                   }}
+                  style={({ pressed }) => [
+                    styles.outlineCta,
+                    pressed && !busy && styles.outlineCtaPressed,
+                    busy && styles.primaryCtaDisabled,
+                  ]}
+                >
+                  <Text style={styles.outlineCtaText}>Add Item</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add items from receipt"
+                  accessibilityHint="Take a photo or choose one from your library"
                   disabled={busy}
-                  styles={styles}
-                />
-                <Text style={styles.sectionLabel}>Overall amount</Text>
-                {totals ? (
-                  <View style={styles.summary}>
-                    <SummaryRow label="Items" value={formatCents(totals.subtotal)} styles={styles} />
-                    {totals.discount ? <SummaryRow label="Discount" value={formatCents(-totals.discount)} styles={styles} /> : null}
-                    {totals.tax ? <SummaryRow label="Tax" value={formatCents(totals.tax)} styles={styles} /> : null}
-                    {totals.tip ? <SummaryRow label="Tip" value={formatCents(totals.tip)} styles={styles} /> : null}
-                    <SummaryRow label={`Total (${form.currency || 'CAD'})`} value={formatCents(totals.total)} styles={styles} total />
-                  </View>
-                ) : (
-                  <Text style={styles.hint}>Fix the item amounts to see the total.</Text>
-                )}
+                  onPress={() => openReceiptPicker({ scanAfter: true })}
+                  style={({ pressed }) => [styles.flatButton, pressed && !busy && styles.flatButtonPressed]}
+                >
+                  <Text style={styles.flatButtonText}>Add Items From Receipt</Text>
+                </Pressable>
+                <View style={styles.sectionDivider} />
+                <Text style={styles.sectionLabel}>Overall Amount</Text>
+                <View style={styles.summary}>
+                  <SummaryRow label="Items" value={formatCents(totals?.subtotal ?? 0)} styles={styles} />
+                  {(totals?.discount ?? 0) ? <SummaryRow label="Discount" value={formatCents(-(totals?.discount ?? 0))} styles={styles} /> : null}
+                  {(totals?.tax ?? 0) ? <SummaryRow label="Tax" value={formatCents(totals?.tax ?? 0)} styles={styles} /> : null}
+                  {(totals?.tip ?? 0) ? <SummaryRow label="Tip" value={formatCents(totals?.tip ?? 0)} styles={styles} /> : null}
+                  <SummaryRow label={`Total (${form.currency || 'CAD'})`} value={formatCents(totals?.total ?? 0)} styles={styles} total />
+                </View>
                 {totals && printedTotal !== null ? (
                   <Text style={styles.warning} accessibilityRole="alert">
                     Total mismatch: the receipt total is {formatCents(printedTotal)}, but the items, discount, tax and tip add up to {formatCents(totals.total)}. Check the items before saving.
                   </Text>
                 ) : null}
-                {!form.items.length ? <Text style={styles.hint}>The total is calculated from the items. Add an item to set it.</Text> : null}
-                {isDrawer ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Use receipt photo instead"
-                    disabled={busy}
-                    onPress={() => setManualEntry(false)}
-                    style={({ pressed }) => [styles.flatButton, pressed && !busy && styles.pickerPressed]}
-                  >
-                    <Text style={styles.flatButtonText}>Use receipt photo instead</Text>
-                  </Pressable>
-                ) : null}
               </>
             ) : (
               <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Add your items"
-                  accessibilityHint="Take a photo or choose one from your library"
-                  disabled={busy}
-                  onPress={openReceiptPicker}
-                  style={({ pressed }) => [
+                <View
+                  style={[
                     styles.dropzone,
-                    pressed && !busy && styles.dropzonePressed,
+                    Boolean(imageUri) && styles.dropzoneWithImage,
                     busy && styles.pickerDisabled,
                   ]}
                 >
-                  {imageUri ? (
-                    <Image source={{ uri: imageUri }} style={styles.dropzonePreview} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.dropzoneContent}>
-                      <SFSymbolIcon
-                        name="square.and.arrow.up"
-                        size={theme.sizes.dropzoneIcon}
-                        color={theme.colors.textPlaceholder}
-                      />
-                      <Text style={styles.dropzoneTitle}>Add Your Items</Text>
-                      <Text style={styles.dropzoneCaption}>
-                        Capture or upload a photo of your receipt and we'll fill in the items.
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-                {hasReceipt && !imageUri ? <Text style={styles.hint}>A receipt is attached.</Text> : null}
-                {asset ? (
-                  <View style={styles.dropzoneActions}>
-                    <Action label="Scan and fill expense" onPress={requestScan} disabled={busy} styles={styles} />
-                    <Action
-                      label="Remove selected photo"
-                      onPress={() => {
-                        clear();
-                      }}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Add your items"
+                    accessibilityHint="Take a photo or choose one from your library"
+                    disabled={busy}
+                    onPress={() => openReceiptPicker()}
+                    style={({ pressed }) => [
+                      styles.dropzoneHit,
+                      pressed && !busy && !imageUri && styles.dropzonePressed,
+                    ]}
+                  >
+                    {imageUri ? (
+                      <Image source={{ uri: imageUri }} style={styles.dropzonePreview} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.dropzoneContent}>
+                        <SFSymbolIcon
+                          name="square.and.arrow.up"
+                          size={theme.sizes.dropzoneIcon}
+                          color={theme.colors.textPlaceholder}
+                        />
+                        <Text style={styles.dropzoneTitle}>Add Your Items</Text>
+                        <Text style={styles.dropzoneCaption}>
+                          Capture or upload a photo of your receipt and we'll fill in the items.
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  {asset ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove selected photo"
                       disabled={busy}
-                      styles={styles}
-                    />
-                  </View>
-                ) : null}
+                      hitSlop={theme.spacing[2]}
+                      onPress={() => clear()}
+                      style={({ pressed }) => [
+                        styles.dropzoneRemove,
+                        pressed && !busy && styles.dropzoneRemovePressed,
+                      ]}
+                    >
+                      <SFSymbolIcon
+                        name="xmark"
+                        size={theme.sizes.iconSm}
+                        color={theme.colors.textPrimary}
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
+                {hasReceipt && !imageUri ? <Text style={styles.hint}>A receipt is attached.</Text> : null}
                 {form.parsed_receipt?.warnings.map((warning, i) => <Text key={i} style={styles.warning}>{warning}</Text>)}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Enter manually"
-                  disabled={busy}
-                  onPress={startManualEntry}
-                  style={({ pressed }) => [styles.flatButton, pressed && !busy && styles.pickerPressed]}
-                >
-                  <Text style={styles.flatButtonText}>Enter Manually</Text>
-                </Pressable>
+                {asset ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Scan and fill expense"
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    onPress={requestScan}
+                    style={({ pressed }) => [
+                      styles.flatButton,
+                      styles.flatButtonRow,
+                      pressed && !busy && styles.flatButtonPressed,
+                    ]}
+                  >
+                    <SFSymbolIcon
+                      name="checkmark"
+                      size={theme.sizes.iconSm}
+                      color={theme.colors.accent}
+                    />
+                    <Text style={styles.flatButtonText}>Scan Expense</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Enter manually"
+                    disabled={busy}
+                    onPress={startManualEntry}
+                    style={({ pressed }) => [styles.flatButton, pressed && !busy && styles.flatButtonPressed]}
+                  >
+                    <Text style={styles.flatButtonText}>Enter Manually</Text>
+                  </Pressable>
+                )}
               </>
             )}
           </>
@@ -744,49 +901,49 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         {busy ? <ActivityIndicator color={theme.colors.accent} /> : null}
 
         {isDrawer && step === 1 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-            accessibilityState={{ disabled: !canContinue || busy }}
-            disabled={!canContinue || busy}
-            onPress={continueToStep2}
-            style={({ pressed }) => [
-              styles.primaryCta,
-              pressed && canContinue && styles.primaryCtaPressed,
-              (!canContinue || busy) && styles.primaryCtaDisabled,
-            ]}
-          >
-            <Text style={styles.primaryCtaText}>Continue</Text>
-          </Pressable>
+          <View style={styles.ctaDock}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue"
+              accessibilityState={{ disabled: !canContinue || busy }}
+              disabled={!canContinue || busy}
+              onPress={continueToStep2}
+              style={({ pressed }) => [
+                styles.primaryCta,
+                pressed && canContinue && styles.primaryCtaPressed,
+                (!canContinue || busy) && styles.primaryCtaDisabled,
+              ]}
+            >
+              <Text style={styles.primaryCtaText}>Continue</Text>
+            </Pressable>
+          </View>
         ) : isDrawer && step === 2 ? (
-          <View style={styles.ctaRow}>
+          <View style={[styles.ctaDock, styles.ctaRow]}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Back"
               disabled={busy}
-              onPress={() => setStep(1)}
+              onPress={() => confirmDiscardItems(discardItemsAndGoToStep1)}
               style={({ pressed }) => [
-                styles.primaryCta,
+                styles.outlineCta,
                 styles.ctaHalf,
-                styles.ctaRowPrimary,
-                pressed && !busy && styles.primaryCtaPressed,
+                pressed && !busy && styles.outlineCtaPressed,
                 busy && styles.primaryCtaDisabled,
               ]}
             >
-              <Text style={styles.primaryCtaText}>Back</Text>
+              <Text style={styles.outlineCtaText}>Back</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Save expense"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
+              accessibilityState={{ disabled: !canSave || busy }}
+              disabled={!canSave || busy}
               onPress={save}
               style={({ pressed }) => [
                 styles.primaryCta,
                 styles.ctaHalf,
-                styles.ctaRowPrimary,
-                pressed && !busy && styles.primaryCtaPressed,
-                busy && styles.primaryCtaDisabled,
+                pressed && canSave && !busy && styles.primaryCtaPressed,
+                (!canSave || busy) && styles.primaryCtaDisabled,
               ]}
             >
               {busy ? (
@@ -797,24 +954,26 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             </Pressable>
           </View>
         ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Save expense"
-            accessibilityState={{ disabled: busy }}
-            disabled={busy}
-            onPress={save}
-            style={({ pressed }) => [
-              styles.primaryCta,
-              pressed && !busy && styles.primaryCtaPressed,
-              busy && styles.primaryCtaDisabled,
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={theme.colors.onAccent} />
-            ) : (
-              <Text style={styles.primaryCtaText}>Save expense</Text>
-            )}
-          </Pressable>
+          <View style={styles.ctaDock}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save expense"
+              accessibilityState={{ disabled: !canSave || busy }}
+              disabled={!canSave || busy}
+              onPress={save}
+              style={({ pressed }) => [
+                styles.primaryCta,
+                pressed && canSave && !busy && styles.primaryCtaPressed,
+                (!canSave || busy) && styles.primaryCtaDisabled,
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={theme.colors.onAccent} />
+              ) : (
+                <Text style={styles.primaryCtaText}>Save expense</Text>
+              )}
+            </Pressable>
+          </View>
         )}
       </ScrollView>
 
@@ -846,11 +1005,29 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           onClose={() => setPickerMode(null)}
         />
       ) : null}
+
+      <InlineSnackbar
+        message={scanToast ?? ''}
+        visible={Boolean(scanToast)}
+        onHidden={() => setScanToast(null)}
+        bottomOffset={bottomPad + theme.spacing[3]}
+      />
     </SafeAreaView>
   );
 }
 
 type Styles = ReturnType<typeof createStyles>;
+
+/** Convert #RRGGBB to rgba() for translucent surfaces. */
+function withAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) return hex;
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function Field({ label, styles, ...props }: React.ComponentProps<typeof TextInput> & { label: string; styles: Styles }) {
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} {...props} style={styles.input} /></View>;
 }
@@ -862,11 +1039,6 @@ function SummaryRow({ label, value, styles, total }: { label: string; value: str
     </View>
   );
 }
-function Action({ label, onPress, disabled, styles, primary }: { label: string; onPress: () => void; disabled?: boolean; styles: Styles; primary?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, primary && styles.primary, disabled && { opacity: 0.5 }]}>
-    <Text style={[styles.text, primary && styles.primaryText]}>{label}</Text>
-  </Pressable>;
-}
 function createStyles(theme: Theme) {
   const m = theme.createActionModal;
 
@@ -875,31 +1047,55 @@ function createStyles(theme: Theme) {
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: theme.colors.bgSurface },
     content: { padding: 20, gap: 12, paddingBottom: 40 },
     drawerContent: {
-      paddingHorizontal: theme.spacing[9], // 36 — match Add Event drawer
+      paddingHorizontal: theme.sizes.pagePaddingX,
       paddingTop: theme.spacing[12], // 48
-      paddingBottom: theme.spacing[9],
       gap: theme.spacing[3],
+    },
+    drawerContentGrow: {
+      flexGrow: 1,
+    },
+    ctaDock: {
+      // Pin actions to the bottom when content is short; scroll lower when it isn't.
+      marginTop: 'auto',
+      paddingTop: theme.spacing[8],
     },
     ctaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing[3],
-      marginTop: theme.spacing[8],
     },
     ctaHalf: {
       flex: 1,
     },
-    ctaRowPrimary: {
-      marginTop: 0,
-    },
     primaryCta: {
       height: m.actionHeight,
-      marginTop: theme.spacing[8],
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: theme.spacing[4],
       borderRadius: theme.radius.full,
       backgroundColor: theme.colors.accent,
+    },
+    outlineCta: {
+      height: m.actionHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing[4],
+      borderRadius: theme.radius.full,
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: theme.colors.accentStrong,
+      backgroundColor: theme.colors.bgSurface,
+    },
+    outlineCtaPressed: {
+      backgroundColor: theme.colors.bgSurfaceAlt,
+    },
+    outlineCtaText: {
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 17,
+      lineHeight: 22,
+      color: theme.colors.accentStrong,
+      textAlign: 'center',
     },
     primaryCtaPressed: {
       backgroundColor: theme.colors.accentActive,
@@ -915,7 +1111,7 @@ function createStyles(theme: Theme) {
       textAlign: 'center',
     },
     sectionLabel: {
-      fontFamily: theme.fonts.sans.medium,
+      fontFamily: theme.fonts.sans.regular,
       fontSize: 16,
       lineHeight: 22,
       letterSpacing: -0.48,
@@ -928,9 +1124,15 @@ function createStyles(theme: Theme) {
       borderColor: theme.colors.borderDefault,
       borderRadius: theme.radius.lg,
       overflow: 'hidden',
+      backgroundColor: theme.colors.bgSurface,
+    },
+    dropzoneWithImage: {
+      height: theme.sizes.receiptDropzonePreview,
+    },
+    dropzoneHit: {
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.bgSurface,
     },
     dropzonePressed: {
       backgroundColor: theme.colors.bgSurfaceAlt,
@@ -945,7 +1147,7 @@ function createStyles(theme: Theme) {
       fontFamily: theme.fonts.sans.semibold,
       fontSize: 16,
       lineHeight: 22,
-      letterSpacing: -0.48,
+      letterSpacing: 0,
       color: theme.colors.textPrimary,
       textAlign: 'center',
     },
@@ -953,7 +1155,7 @@ function createStyles(theme: Theme) {
       fontFamily: theme.fonts.sans.regular,
       fontSize: 14,
       lineHeight: 20,
-      letterSpacing: -0.42,
+      letterSpacing: 0,
       color: theme.colors.textSecondary,
       textAlign: 'center',
     },
@@ -961,20 +1163,42 @@ function createStyles(theme: Theme) {
       width: '100%',
       height: '100%',
     },
-    dropzoneActions: {
-      gap: theme.spacing[3],
+    dropzoneRemove: {
+      position: 'absolute',
+      top: theme.spacing[3],
+      // 4 (prior inset) + 6 toward center
+      right: theme.spacing[1] + theme.spacing[1.5],
+      width: theme.sizes.controlSm,
+      height: theme.sizes.controlSm,
+      borderRadius: theme.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withAlpha(theme.colors.bgSurface, 0.72),
+      ...theme.shadows.nav,
+    },
+    dropzoneRemovePressed: {
+      opacity: 0.7,
     },
     flatButton: {
       alignSelf: 'center',
       minHeight: theme.sizes.touchTarget,
       justifyContent: 'center',
-      paddingHorizontal: theme.spacing[3],
+      paddingHorizontal: theme.spacing[6],
+      borderRadius: theme.radius.full,
+    },
+    flatButtonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[2], // 8 — icon to label
+    },
+    flatButtonPressed: {
+      backgroundColor: theme.colors.bgSurfaceAlt,
     },
     flatButtonText: {
       fontFamily: theme.fonts.sans.semibold,
       fontSize: 16,
       lineHeight: 22,
-      letterSpacing: -0.48,
+      letterSpacing: 0,
       color: theme.colors.accent,
       textAlign: 'center',
     },
@@ -1064,21 +1288,122 @@ function createStyles(theme: Theme) {
       ...theme.typography.bodySm,
       color: theme.colors.textSecondary,
     },
-    button: { minHeight: 46, justifyContent: 'center', alignItems: 'center', padding: 12, borderWidth: 1, borderColor: theme.colors.accentStrong, borderRadius: 10 },
-    primary: { backgroundColor: theme.colors.accent },
-    primaryText: { color: theme.colors.onAccent },
-    preview: { width: '100%', height: 220, borderRadius: 10 },
     warning: { color: theme.colors.textPrimary, backgroundColor: theme.colors.accentSubtle, padding: 12, borderRadius: 8 },
-    choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    choice: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.borderSubtle },
-    selected: { borderColor: theme.colors.accentStrong, backgroundColor: theme.colors.accentSubtle },
-    item: { borderWidth: 1, borderColor: theme.colors.borderSubtle, borderRadius: 10, padding: 12, gap: 10 },
-    itemRow: { flexDirection: 'row', gap: theme.spacing[3] },
-    quantity: { flex: 1 },
-    amount: { flex: 2 },
+    item: {
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: theme.colors.borderSubtle,
+      borderRadius: theme.radius.lg,
+      // Visible so the category popover can extend below the card.
+      overflow: 'visible',
+      backgroundColor: theme.colors.bgSurface,
+      zIndex: 1,
+    },
+    itemHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing[2],
+      paddingLeft: theme.spacing[4],
+      paddingRight: theme.spacing[3],
+      paddingVertical: theme.spacing[2],
+      borderBottomWidth: theme.sizes.borderWidth,
+      borderBottomColor: theme.colors.borderSubtle,
+      minHeight: theme.sizes.controlLg,
+    },
+    itemName: {
+      flex: 1,
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 16,
+      letterSpacing: -0.48,
+      color: theme.colors.textPrimary,
+      minHeight: theme.sizes.touchTarget,
+      paddingVertical: theme.spacing[2],
+    },
+    itemBody: {
+      gap: theme.spacing[3],
+      paddingHorizontal: theme.spacing[3],
+      paddingVertical: theme.spacing[3],
+      overflow: 'visible',
+      zIndex: 2,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[2],
+    },
+    itemRemove: {
+      width: theme.sizes.touchTarget,
+      height: theme.sizes.touchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: -theme.spacing[2],
+    },
+    itemRemovePressed: {
+      opacity: 0.7,
+    },
+    quantityControl: {
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: theme.colors.borderSubtle,
+      borderRadius: theme.radius.lg,
+      paddingHorizontal: theme.spacing[4],
+      paddingVertical: theme.spacing[3],
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: theme.sizes.controlLg,
+    },
+    quantityInput: {
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 16,
+      letterSpacing: -0.48,
+      color: theme.colors.textPrimary,
+      textAlign: 'center',
+      // Wide enough for the caret to paint next to a digit / placeholder.
+      minWidth: theme.spacing[8],
+      padding: 0,
+    },
+    amountControl: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: theme.colors.borderSubtle,
+      borderRadius: theme.radius.lg,
+      paddingHorizontal: theme.spacing[4],
+      paddingVertical: theme.spacing[3],
+      gap: theme.spacing[1],
+    },
+    amountPrefix: {
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 16,
+      letterSpacing: -0.48,
+      color: theme.colors.textPrimary,
+    },
+    amountPrefixPlaceholder: {
+      color: theme.colors.textTertiary,
+    },
+    amountInput: {
+      flex: 1,
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 16,
+      letterSpacing: -0.48,
+      color: theme.colors.textPrimary,
+      padding: 0,
+      minWidth: 0,
+    },
+    categoryTrigger: {
+      borderRadius: theme.radius.lg,
+      paddingHorizontal: theme.spacing[4],
+      paddingVertical: theme.spacing[3],
+      minHeight: undefined,
+    },
+    sectionDivider: {
+      height: theme.sizes.borderWidth,
+      backgroundColor: theme.colors.borderSubtle,
+      marginVertical: theme.spacing[3],
+    },
     summary: {
       gap: theme.spacing[2],
-      padding: theme.spacing[3],
+      padding: theme.spacing[5],
       borderRadius: theme.radius.lg,
       backgroundColor: theme.colors.bgSurfaceAlt,
     },

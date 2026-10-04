@@ -132,7 +132,7 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.colors.bgSurface,
     },
     content: {
-      paddingHorizontal: theme.spacing[9], // 36
+      paddingHorizontal: theme.sizes.pagePaddingX,
       paddingBottom: theme.spacing[9],
       paddingTop: theme.spacing[12], // 48
     },

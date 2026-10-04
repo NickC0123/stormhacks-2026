@@ -150,6 +150,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
 /** 4pt spacing scale (matches design-spec `--space-*`). */
 export const spacing = {
   0: 0,
+  0.5: 2,
   1: 4,
   1.5: 6,
   2: 8,
@@ -271,6 +272,14 @@ export const shadows = {
     shadowRadius: 8,
     elevation: 2,
   } satisfies ShadowToken,
+  /** Dropdown / popover menus (design-spec `--shadow-lg`). */
+  lg: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 15,
+    elevation: 8,
+  } satisfies ShadowToken,
 } as const;
 
 export const sizes = {
@@ -292,16 +301,23 @@ export const sizes = {
   navBarHeight: 52,
   /** Floating bottom nav inset from screen edges. */
   navPaddingX: 24,
+  /** Horizontal inset for pages and full-height drawers/panels. */
+  pagePaddingX: 24,
   /** Bottom content fade height (Figma Events scrim ~130). */
   bottomFade: 130,
   /** Native iOS date/time spinner wheel height. */
   dateTimePicker: 216,
   /** Thin step progress track under drawer titles. */
   progressBar: 4,
-  /** Receipt upload dropzone height (Figma Add Expense step 2). */
+  /** Receipt upload empty-state height (Figma Add Expense step 2). */
   receiptDropzone: 290,
+  /** Receipt preview height after a photo is selected. */
+  receiptDropzonePreview: 340,
   /** Upload glyph inside the receipt dropzone. */
   dropzoneIcon: 38,
+  /** Select / dropdown menu — ~4 options tall so the list scrolls. */
+  dropdownMaxHeight: 176,
+  dropdownMinWidth: 192,
 } as const;
 
 export const opacity = {
