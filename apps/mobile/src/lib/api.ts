@@ -39,6 +39,7 @@ async function errorMessage(res: Response): Promise<string> {
   try {
     const { detail } = JSON.parse(text);
     if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map((error) => `${error.loc?.slice(1).join('.') || 'Input'}: ${error.msg}`).join('\n');
   } catch {
     // Not a FastAPI JSON error; fall through to the raw body.
   }

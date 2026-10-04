@@ -57,6 +57,22 @@ The app opens on Supabase email/password sign-in. Choose **Create an account** f
 
 Put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` file, and the matching project URL and legacy `service_role` key in the ignored `apps/api/.env.cloud` file. The current Python client expects the JWT-formatted service-role key; find it under the project's legacy API keys. Set `EXPO_PUBLIC_API_URL` in the mobile file to your computer's LAN address on port 8000. The service-role key belongs only in the API file, never in the mobile app or Git. Apply the migrations in `supabase/migrations/` to the hosted database before creating events. Run `./dev up` to start Expo and the API, and `./dev down` to stop them.
 
+### Expenses
+
+Apply `supabase/migrations/20261004000000_expenses.sql` in the hosted SQL editor once.
+It creates the `expenses` table and private `receipts` storage bucket.
+
+Open **Expenses → New expense** to enter details manually or choose a receipt photo.
+**Scan and fill expense** uses the existing parser to populate editable fields;
+**Save expense** stores the fields and attaches the selected photo. Open a saved
+expense to attach a receipt later. Events are optional. Splitting is not included yet.
+
+The authenticated API provides `GET/POST /api/v1/expenses`,
+`GET/PUT /api/v1/expenses/{id}`, and `POST/GET /api/v1/expenses/{id}/receipt`.
+Expense date and optional time are local calendar values; scans with only a date
+leave time empty. Item amounts and the overall amount are independent, and parser
+warnings and original JSON are retained for review.
+
 ### Using a physical phone
 
 Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000. Make sure the phone and computer are on the same Wi-Fi. Update that URL when your LAN IP changes.

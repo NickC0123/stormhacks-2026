@@ -104,8 +104,7 @@ export function CreateActionModal({ visible, onClose }: Props) {
 
   function goNewExpense() {
     requestClose();
-    // Same destination as "Add receipt" on the event screen (temporary test event).
-    router.push({ pathname: '/events/[eventId]/receipts/scan', params: { eventId: 'test' } });
+    router.push('/expenses/new');
   }
 
   const scale = progress.interpolate({

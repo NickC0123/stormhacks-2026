@@ -53,7 +53,8 @@ async def scan_receipt(file: UploadFile, user: CurrentUserDep) -> ParsedReceipt:
     except ReceiptParserNotConfiguredError as exc:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Receipt scanning is not configured. Set GEMINI_API_KEY in apps/api/.env.",
+            "Receipt scanning is not configured. Set GEMINI_API_KEY in "
+            "apps/api/.env.cloud and restart the API.",
         ) from exc
     except ReceiptParseError as exc:
         logger.warning("Receipt scan failed: %s", exc)

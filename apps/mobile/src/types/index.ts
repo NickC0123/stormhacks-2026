@@ -77,3 +77,31 @@ export type Memory = {
   photoPath?: string | null;
   createdAt: string;
 };
+
+export type ExpenseItem = {
+  id?: UUID;
+  name: string;
+  category: ItemCategory;
+  amount: string;
+  quantity?: number | string;
+  unit_price?: string | null;
+};
+
+export type ExpenseWrite = {
+  title: string;
+  description: string | null;
+  date: string;
+  time: string | null;
+  currency: string;
+  amount: string;
+  event_id: UUID | null;
+  items: ExpenseItem[];
+  parsed_receipt: ParsedReceipt | null;
+};
+
+export type Expense = ExpenseWrite & {
+  id: UUID;
+  created_by: UUID;
+  created_at: string;
+  receipt_image_path: string | null;
+};

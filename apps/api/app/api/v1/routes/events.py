@@ -11,7 +11,23 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 @router.get("", response_model=list[Event])
 def list_events(user: CurrentUserDep) -> list[Event]:
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+    db = get_supabase()
+    owned = db.table("events").select("*").eq("created_by", user.id).execute().data
+    memberships = db.table("event_members").select("event_id").eq("user_id", user.id).execute().data
+    member_events = []
+    if memberships:
+        member_events = (
+            db.table("events")
+            .select("*")
+            .in_("id", [row["event_id"] for row in memberships])
+            .execute()
+            .data
+        )
+    rows = {row["id"]: row for row in [*owned, *member_events]}
+    return [
+        Event(**row)
+        for row in sorted(rows.values(), key=lambda row: row["created_at"], reverse=True)
+    ]
 
 
 @router.post("", response_model=Event, status_code=status.HTTP_201_CREATED)
