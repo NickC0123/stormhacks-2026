@@ -123,6 +123,8 @@ export const radius = {
   md: 8,
   lg: 12,
   xl: 16,
+  /** iOS sheet / create-action alert corners (Figma Sheet/iPhone/Top Radius). */
+  sheet: 34,
   full: 9999,
 } as const;
 
@@ -200,9 +202,11 @@ export const sizes = {
   touchTarget: 44,
   fab: 52,
   navBarHeight: 52,
+  /** Floating bottom nav inset from screen edges (Figma: 14px). */
+  navPaddingX: 14,
 } as const;
 
-/** Motion tokens (matches design-spec `--duration-*` / tab slide easing). */
+/** Motion tokens (matches design-spec `--duration-*` / transitions.dev). */
 export const motion = {
   duration: {
     instant: 75,
@@ -210,8 +214,25 @@ export const motion = {
     normal: 250,
     slow: 400,
   },
-  /** cubic-bezier(0.22, 1, 0.36, 1) — transitions.dev tabs / calm slide */
+  /** cubic-bezier(0.22, 1, 0.36, 1) — tabs + modal */
   easeTab: [0.22, 1, 0.36, 1] as const,
+  modal: {
+    openDur: 250,
+    closeDur: 150,
+    scale: 0.96,
+  },
+} as const;
+
+/** Create-action alert geometry from Figma Alert `11:2077`. */
+export const createActionModal = {
+  width: 300,
+  padding: 14,
+  /** Outer 14 + title-frame inset 8 */
+  titlePaddingTop: 22,
+  /** From title text bottom to buttons frame */
+  titleToActions: 34,
+  actionGap: 10,
+  actionHeight: 48,
 } as const;
 
 export type Theme = {
@@ -224,6 +245,7 @@ export type Theme = {
   shadows: typeof shadows;
   sizes: typeof sizes;
   motion: typeof motion;
+  createActionModal: typeof createActionModal;
 };
 
 export function createTheme(scheme: ColorScheme): Theme {
@@ -237,5 +259,6 @@ export function createTheme(scheme: ColorScheme): Theme {
     shadows,
     sizes,
     motion,
+    createActionModal,
   };
 }

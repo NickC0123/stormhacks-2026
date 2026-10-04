@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CreateActionModal } from '@/components/ui/CreateActionModal';
 import { useTheme, type Theme } from '@/theme';
 
 type TabKey = 'index' | 'expenses' | 'profile';
@@ -87,6 +87,7 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
   const layouts = useRef<Partial<Record<TabKey, TabLayout>>>({});
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const hasPositioned = useRef(false);
 
   const pillX = useRef(new Animated.Value(0)).current;
@@ -216,13 +217,15 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Create event"
-          onPress={() => router.push('/events/new')}
+          accessibilityLabel="Add"
+          onPress={() => setCreateOpen(true)}
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         >
           <Ionicons name="add" size={theme.sizes.iconLg} color={theme.colors.onAccent} />
         </Pressable>
       </View>
+
+      <CreateActionModal visible={createOpen} onClose={() => setCreateOpen(false)} />
     </View>
   );
 }
@@ -235,7 +238,7 @@ function createStyles(theme: Theme) {
       right: 0,
       bottom: 0,
       paddingTop: theme.spacing[3],
-      paddingHorizontal: theme.spacing[3],
+      paddingHorizontal: theme.sizes.navPaddingX, // 14
     },
     row: {
       flexDirection: 'row',

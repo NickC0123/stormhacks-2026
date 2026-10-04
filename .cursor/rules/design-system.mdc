@@ -10,7 +10,7 @@ The full spec is @docs/design-spec.md. It was written for web CSS, so use it for
 ## Hard rules
 
 - Never hard-code colors, font sizes, spacing, radii, shadows, durations, or z-order values in components. Import them from the theme (`src/theme/tokens.ts`, accessed with `useTheme()`).
-- If a needed value does not exist as a token, propose adding it to the theme and the spec first. Do not invent one-off values inline.
+- If a needed value does not exist as a token, add it to the theme (`src/theme/tokens.ts`) first. Do not invent one-off values inline. Keep `docs/design-spec.md` for design intent and component anatomy; exact numeric tokens do not need to be duplicated there.
 - Build new screens from the components in `src/components/ui/` before creating new ones. If a component is missing, create it there following the spec's component section, not inside a screen file.
 - Components consume semantic tokens only (`colors.textPrimary`, `colors.accent`), never primitives (`teal500`) or raw hex.
 

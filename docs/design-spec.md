@@ -567,12 +567,20 @@ bg `--color-bg-inverse`, text `--color-text-inverse`, `--text-xs`, padding `--sp
 ### 6.12b Floating bottom navigation (mobile)
 Source: Figma `stormhacks-designin` / Frame 5. Floating bar above the home indicator; not edge-to-edge.
 
-- **Layout:** horizontal row, `justify-content: space-between`, padding `--space-3`, safe-area inset bottom. Left: pill tablist. Right: circular create FAB. Gap `--space-2`.
+- **Layout:** horizontal row, `justify-content: space-between`, horizontal padding 14px (`--size-nav-padding-x`), safe-area inset bottom. Left: pill tablist. Right: circular create FAB. Gap `--space-2`.
 - **Pill:** bg `--color-nav-bar`, radius `--radius-full`, padding `--space-2` / (`--space-1` + 2px), gap `--space-1`, shadow `0 4px 7.1px rgb(0 0 0 / 0.13)`.
 - **Tab item:** icon + label (`label` / 13px), gap `--space-1`, padding `--space-4` / `--space-3`, min touch `--touch-target-min`, radius `--radius-full`, transparent bg. Inactive: `--color-nav-item-inactive`. Active: color `--color-nav-item-active` (brand teal per Figma).
 - **Sliding active pill:** absolutely positioned behind tabs (`z-index: 0`). Animate `translateX` + `width` (and top/height if needed) over `--duration-normal` with ease `cubic-bezier(0.22, 1, 0.36, 1)`. Snap with no transition on first layout / resize. Respect `prefers-reduced-motion`. Pill fill: `--color-nav-item-active-bg`.
-- **FAB:** size 52px, radius `--radius-full`, bg `--color-accent`, icon `plus` in `--color-on-accent` (white). Pressed: `--color-accent-active`. Opens create-event. `accessibilityLabel` required.
+- **FAB:** size 52px, radius `--radius-full`, bg `--color-accent`, icon `plus` in `--color-on-accent` (white). Pressed: `--color-accent-active`. Opens the create-action alert. `accessibilityLabel` required.
 - **Tabs:** Events, Expenses, Profile. Hide other destinations from this bar.
+
+### 6.12c Create-action alert (mobile)
+Source: Figma `stormhacks-designin` / Alert on Frame iPhone 17 - 5. Centered chooser opened from the FAB. Exact sizes, colors, and motion live in `apps/mobile/src/theme/tokens.ts`.
+
+- Centered dialog over a dimmed overlay (tap outside to dismiss).
+- Title: “What would you like to add?”
+- Stacked actions: **Add Event** → `/events/new`, **New Expense** → add-receipt scan (same as event “Add receipt”).
+- Open/close uses the transitions.dev modal scale + fade (see `motion.modal` in theme tokens).
 
 ### 6.13 Table
 Header: `overline`-style or `label`, bg `--color-bg-surface-alt`, sticky optional. Cell padding `--space-3 var(--space-4)`, `body-sm`, row border-bottom `--color-border-subtle`. Row hover bg `--color-bg-surface-alt`. Numeric columns right-aligned with `font-variant-numeric: tabular-nums`. Wrap in a horizontally scrollable container on small screens. Provide empty and loading (skeleton) states.
