@@ -34,11 +34,11 @@ export default function NewEventScreen() {
     const eventTitle = title.trim();
     setBusy(true);
     try {
-      await apiFetch<CreatedEvent>('/events', {
+      const event = await apiFetch<CreatedEvent>('/events', {
         method: 'POST',
         body: JSON.stringify({ title: eventTitle, description: description.trim() || null }),
       });
-      router.back();
+      router.replace({ pathname: '/events/[eventId]', params: { eventId: event.id } });
       // Wait for the modal dismiss so the toast doesn't play under the closing drawer.
       setTimeout(() => {
         showSnackbar({ message: 'Event created successfully.', variant: 'success' });

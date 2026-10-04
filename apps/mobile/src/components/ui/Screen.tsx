@@ -27,6 +27,8 @@ type Props = {
   /** Enables pull-to-refresh when set. */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /** Set when a navigation header is shown above the screen; it already covers the top inset. */
+  withHeader?: boolean;
   children?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   /** Soft scrim over the bottom of scrolling content (Events). */
@@ -44,6 +46,7 @@ export function Screen({
   headerRight,
   onRefresh,
   refreshing = false,
+  withHeader = false,
   children,
   contentStyle,
   bottomFade = false,
@@ -59,7 +62,7 @@ export function Screen({
   return (
     <SafeAreaView
       style={styles.container}
-      edges={['top', 'left', 'right']}
+      edges={withHeader ? ['left', 'right'] : ['top', 'left', 'right']}
     >
       <View style={styles.body}>
         <ScrollView

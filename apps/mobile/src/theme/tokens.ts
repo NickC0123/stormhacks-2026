@@ -194,6 +194,29 @@ export const typography = {
     fontSize: 24,
     lineHeight: 30,
   } satisfies TextStyle,
+  /** Section / card title. */
+  h4: {
+    fontFamily: fonts.sans.semibold,
+    fontSize: 20,
+    lineHeight: 26,
+  } satisfies TextStyle,
+  /** Button labels for sm/md controls. */
+  button: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 14,
+    lineHeight: 20,
+  } satisfies TextStyle,
+  buttonLg: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 16,
+    lineHeight: 24,
+  } satisfies TextStyle,
+  /** Emphasized body text, e.g. list row titles. */
+  bodyStrong: {
+    fontFamily: fonts.sans.semibold,
+    fontSize: 16,
+    lineHeight: 24,
+  } satisfies TextStyle,
   body: {
     fontFamily: fonts.sans.regular,
     fontSize: 16,

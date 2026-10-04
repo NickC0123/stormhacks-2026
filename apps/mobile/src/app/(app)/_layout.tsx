@@ -52,7 +52,11 @@ function AppNavigator() {
         />
         <Stack.Screen name="expenses/new" options={{ headerShown: true, title: 'New expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
-        <Stack.Screen name="events/[eventId]/index" />
+        <Stack.Screen name="events/[eventId]/index" options={{ headerShown: true, title: 'Event', headerBackTitle: 'Back' }} />
+        <Stack.Screen
+          name="events/[eventId]/invite"
+          options={{ presentation: 'modal', headerShown: true, title: 'Invite friends' }}
+        />
         <Stack.Screen name="events/[eventId]/memories" />
         <Stack.Screen name="events/[eventId]/receipts/[receiptId]" />
         <Stack.Screen
