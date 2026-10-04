@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EventPhotos } from '@/components/events/EventPhotos';
 import { FriendRow } from '@/components/friends/FriendRow';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { useFocusedData } from '@/hooks/useFocusedData';
 import { deleteEvent, displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
@@ -68,7 +69,26 @@ export default function EventScreen() {
 
   return (
     <Screen title={event.title} description={description} onRefresh={refresh} refreshing={refreshing} withHeader>
+      {event.created_by === profile?.id ? (
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Pressable
+                onPress={confirmDelete}
+                disabled={deleting}
+                hitSlop={theme.spacing[2]}
+                accessibilityRole="button"
+                accessibilityLabel="Delete event"
+                style={({ pressed }) => (pressed || deleting) && styles.pressed}
+              >
+                <SFSymbolIcon name="trash" size={22} color={theme.colors.danger} />
+              </Pressable>
+            ),
+          }}
+        />
+      ) : null}
       <View style={styles.content}>
+        {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
         <View style={styles.actions}>
           <Button
             label="Manage people"
@@ -81,7 +101,7 @@ export default function EventScreen() {
           />
         </View>
 
-        <EventPhotos eventId={eventId} />
+        <EventPhotos eventId={eventId} hostId={event.created_by} userId={profile?.id} />
 
         <ListGroup title="Members" count={event.members.length}>
           {event.members.map((member) => {
@@ -126,12 +146,6 @@ export default function EventScreen() {
           </ListGroup>
         ) : null}
 
-        {event.created_by === profile?.id ? (
-          <View style={styles.danger}>
-            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
-            <Button label="Delete event" variant="danger" loading={deleting} onPress={confirmDelete} fullWidth />
-          </View>
-        ) : null}
       </View>
     </Screen>
   );
@@ -148,8 +162,8 @@ function createStyles(theme: Theme) {
       flexWrap: 'wrap',
       gap: theme.spacing[3],
     },
-    danger: {
-      gap: theme.spacing[2],
+    pressed: {
+      opacity: theme.opacity.disabled,
     },
     error: {
       fontFamily: theme.fonts.sans.regular,

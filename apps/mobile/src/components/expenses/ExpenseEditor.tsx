@@ -1,5 +1,5 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -555,6 +555,24 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
 
   return (
     <SafeAreaView style={styles.container} edges={isDrawer ? [] : ['left', 'right']}>
+      {isDrawer ? null : (
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Pressable
+                onPress={confirmDelete}
+                disabled={busy}
+                hitSlop={theme.spacing[2]}
+                accessibilityRole="button"
+                accessibilityLabel="Delete expense"
+                style={({ pressed }) => (pressed || busy) && styles.primaryCtaDisabled}
+              >
+                <SFSymbolIcon name="trash" size={22} color={theme.colors.danger} />
+              </Pressable>
+            ),
+          }}
+        />
+      )}
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -1003,20 +1021,6 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 <Text style={styles.primaryCtaText}>Save expense</Text>
               )}
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Delete expense"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
-              onPress={confirmDelete}
-              style={({ pressed }) => [
-                styles.deleteCta,
-                pressed && !busy && styles.outlineCtaPressed,
-                busy && styles.primaryCtaDisabled,
-              ]}
-            >
-              <Text style={styles.deleteCtaText}>Delete expense</Text>
-            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -1130,20 +1134,6 @@ function createStyles(theme: Theme) {
       borderWidth: theme.sizes.borderWidth,
       borderColor: theme.colors.accentStrong,
       backgroundColor: theme.colors.bgSurface,
-    },
-    deleteCta: {
-      height: m.actionHeight,
-      marginTop: theme.spacing[3],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radius.full,
-    },
-    deleteCtaText: {
-      fontFamily: theme.fonts.sans.medium,
-      fontSize: 17,
-      lineHeight: 22,
-      color: theme.colors.danger,
-      textAlign: 'center',
     },
     outlineCtaPressed: {
       backgroundColor: theme.colors.bgSurfaceAlt,
