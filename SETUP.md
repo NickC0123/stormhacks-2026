@@ -1,6 +1,6 @@
 # Setup guide
 
-Run Supabase (database, auth, storage), the FastAPI backend, and the Expo mobile app with one command.
+Connect the FastAPI backend and Expo mobile app to hosted Supabase with one command.
 
 Estimated time: 15–20 minutes (the first Docker pull is the slow part).
 
@@ -11,12 +11,10 @@ Estimated time: 15–20 minutes (the first Docker pull is the slow part).
 | Git | any | `git --version` | https://git-scm.com |
 | Node.js | 22.13+ or 24.3+ (LTS) | `node -v` | https://nodejs.org |
 | Docker Desktop | any recent | `docker --version` | https://www.docker.com/products/docker-desktop |
-| Supabase CLI | any recent | `supabase --version` | https://supabase.com/docs/guides/local-development/cli/getting-started |
 | Expo Go (phone) or a simulator | latest | — | App Store / Google Play, or Xcode / Android Studio |
 
 Notes:
 - **Docker must be running** (open Docker Desktop and wait until it says it is running).
-- If you skip the Supabase CLI install, `./dev` falls back to `npx supabase`, which works but is slower.
 - **Windows:** use Git Bash or WSL for all commands below. `./dev` is a bash script and will not run in PowerShell or cmd.
 - A **Gemini API key** is only needed for receipt scanning. Get one at https://aistudio.google.com/apikey.
 
@@ -57,11 +55,11 @@ The app opens on Supabase email/password sign-in. Choose **Create an account** f
 
 ### Hosted Supabase project
 
-For hosted development, put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` file, and the matching project URL and legacy `service_role` key in the ignored `apps/api/.env.cloud` file. The current Python client expects the JWT-formatted service-role key; find it under the project's legacy API keys. Set `EXPO_PUBLIC_API_URL` in the mobile file to your computer's LAN address on port 8000. The service-role key belongs only in the API file, never in the mobile app or Git. Apply the migrations in `supabase/migrations/` to the hosted database before creating events. Then run `./dev up` (or `./dev up cloud`); use `./dev down` to stop Expo and the API. Cloud mode does not start, stop, or overwrite local Supabase. For an optional local database, run `./dev up local` and stop it with `./dev down local`.
+Put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` file, and the matching project URL and legacy `service_role` key in the ignored `apps/api/.env.cloud` file. The current Python client expects the JWT-formatted service-role key; find it under the project's legacy API keys. Set `EXPO_PUBLIC_API_URL` in the mobile file to your computer's LAN address on port 8000. The service-role key belongs only in the API file, never in the mobile app or Git. Apply the migrations in `supabase/migrations/` to the hosted database before creating events. Run `./dev up` to start Expo and the API, and `./dev down` to stop them.
 
 ### Using a physical phone
 
-Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000. Make sure the phone and computer are on the same Wi-Fi. Update that URL when your LAN IP changes. For local mode, you can override detection with `DEV_HOST=192.168.1.20 ./dev up local`.
+Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000. Make sure the phone and computer are on the same Wi-Fi. Update that URL when your LAN IP changes.
 
 Find your LAN IP with `ipconfig getifaddr en0` (macOS), `hostname -I` (Linux), or `ipconfig` (Windows).
 
@@ -80,8 +78,6 @@ This stops Expo and the API container. Hosted Supabase keeps running and retains
 | Start everything | `./dev up` |
 | Stop everything | `./dev down` |
 | Follow API logs | `docker compose logs -f api` |
-| Reset the optional local database | `supabase db reset` |
-| Show optional local Supabase URLs and keys | `supabase status` |
 | Follow Expo logs | `tail -f .dev/expo.log` |
 | Typecheck mobile | `cd apps/mobile && npm run typecheck` |
 | Lint + test API | `cd apps/api && ruff check . && pytest` |
@@ -94,8 +90,8 @@ The API reloads automatically when you edit files in `apps/api`. The mobile app 
 **`Cannot connect to the Docker daemon`**
 Docker Desktop is not running. Start it and retry.
 
-**Port already in use (8000, 54321, 54322, ...)**
-Another process is using the port. Stop it, or run `./dev down` and `supabase stop` to clear leftover containers from a previous run.
+**Port already in use (8000 or 8081)**
+Another process is using the port. Stop it, or run `./dev down` to clear leftover containers from a previous run.
 
 **API returns 401 or crashes on startup**
 `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env.cloud` is missing or wrong. Copy the hosted project’s legacy service_role key and run `./dev up` again.

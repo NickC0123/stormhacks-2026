@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# Start the API and Expo with either local or hosted Supabase.
+# Start the API and Expo against hosted Supabase.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if command -v supabase >/dev/null 2>&1; then
-  SUPABASE=(supabase)
-else
-  SUPABASE=(npx --yes supabase)
-fi
-
 case "${1:-}" in
   up)
-    mode="${2:-cloud}"
-    if [[ "$mode" != "local" && "$mode" != "cloud" ]]; then
-      echo "Usage: ./dev up [local|cloud]" >&2
+    if [[ "${2:-}" != "" ]]; then
+      echo "Usage: ./dev up | ./dev down" >&2
       exit 1
     fi
     command -v docker >/dev/null || { echo "Docker is required." >&2; exit 1; }
@@ -22,30 +15,18 @@ case "${1:-}" in
     node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 22 && minor >= 13) || (major >= 24 && major % 2 === 0 && (major > 24 || minor >= 3)))) { console.error("Expo SDK 57 needs Node.js 22.13+ or 24.3+ (LTS). Current: " + process.version); process.exit(1); }'
     docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry ./dev up." >&2; exit 1; }
     mkdir -p .dev
-    if [[ "$mode" == "local" ]]; then
-      # Skip optional services to keep local startup fast.
-      echo "Starting Supabase..."
-      if ! "${SUPABASE[@]}" start -x "${SUPABASE_EXCLUDE:-logflare,vector,postgres-meta,studio,edge-runtime}" >.dev/supabase-start.log 2>&1; then
-        echo "Supabase failed to start. See .dev/supabase-start.log." >&2
-        exit 1
-      fi
-      "${SUPABASE[@]}" status -o json | node scripts/configure-local.mjs
-      docker compose up --build -d
-      expo_node=(node)
-    else
-      if [[ ! -f apps/mobile/.env.cloud || ! -f apps/api/.env.cloud ]]; then
-        echo "Cloud env files are missing. See SETUP.md." >&2
-        exit 1
-      fi
-      if ! grep -Eq '^SUPABASE_SERVICE_ROLE_KEY=.+$' apps/api/.env.cloud; then
-        echo "Add the hosted legacy service_role key to apps/api/.env.cloud before starting cloud mode." >&2
-        exit 1
-      fi
-      API_ENV_FILE=./apps/api/.env.cloud docker compose up --build -d
-      export EXPO_NO_DOTENV=1
-      expo_node=(node --env-file=apps/mobile/.env.cloud)
-      "${expo_node[@]}" -e 'console.log("Using hosted Supabase: " + process.env.EXPO_PUBLIC_SUPABASE_URL)'
+    if [[ ! -f apps/mobile/.env.cloud || ! -f apps/api/.env.cloud ]]; then
+      echo "Cloud env files are missing. See SETUP.md." >&2
+      exit 1
     fi
+    if ! grep -Eq '^SUPABASE_SERVICE_ROLE_KEY=.+$' apps/api/.env.cloud; then
+      echo "Add the hosted legacy service_role key to apps/api/.env.cloud before starting." >&2
+      exit 1
+    fi
+    API_ENV_FILE=./apps/api/.env.cloud docker compose up --build -d
+    export EXPO_NO_DOTENV=1
+    expo_node=(node --env-file=apps/mobile/.env.cloud)
+    "${expo_node[@]}" -e 'console.log("Using hosted Supabase: " + process.env.EXPO_PUBLIC_SUPABASE_URL)'
 
     if [ ! -f apps/mobile/node_modules/.package-lock.json ] || ! node -e 'require.resolve("qrcode-terminal", { paths: ["./apps/mobile"] })' >/dev/null 2>&1; then
       npm ci --prefix apps/mobile
@@ -55,18 +36,18 @@ case "${1:-}" in
     "${expo_node[@]}" scripts/expo-qr.mjs
     echo "API: http://localhost:8000/docs"
     echo "Expo: http://localhost:8081 (logs: .dev/expo.log)"
-    echo "Use ./dev down $mode to stop this stack."
+    echo "Use ./dev down to stop this stack."
     ;;
   down)
-    mode="${2:-cloud}"
+    if [[ "${2:-}" != "" ]]; then
+      echo "Usage: ./dev up | ./dev down" >&2
+      exit 1
+    fi
     node scripts/expo-process.mjs stop
     docker compose down
-    if [[ "$mode" == "local" ]]; then
-      "${SUPABASE[@]}" stop
-    fi
     ;;
   *)
-    echo "Usage: ./dev up [local|cloud] | ./dev down [local|cloud]" >&2
+    echo "Usage: ./dev up | ./dev down" >&2
     exit 1
     ;;
 esac

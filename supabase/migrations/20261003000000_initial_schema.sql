@@ -1,4 +1,4 @@
--- Initial schema draft. Apply locally with `supabase db reset`.
+-- Initial schema draft. Apply to the hosted Supabase project.
 -- RLS is enabled on every table; the FastAPI backend uses the service-role key.
 -- Add policies before letting the mobile app query tables directly.
 

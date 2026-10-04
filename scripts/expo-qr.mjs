@@ -1,12 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../apps/mobile/package.json', import.meta.url));
 const qr = require('qrcode-terminal');
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? readFileSync(
-  new URL('../apps/mobile/.env.local', import.meta.url), 'utf8',
-).match(/^EXPO_PUBLIC_API_URL=(.+)$/m)?.[1].trim();
-if (!apiUrl) throw new Error('Mobile API URL is missing. Run ./dev up to configure it.');
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+if (!apiUrl) throw new Error('Set EXPO_PUBLIC_API_URL in apps/mobile/.env.cloud.');
 const host = new URL(apiUrl).hostname;
 const url = `exp://${host}:8081`;
 

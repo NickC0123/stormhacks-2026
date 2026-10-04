@@ -42,10 +42,8 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 │       ├── Dockerfile
 │       └── requirements*.txt
 ├── supabase/
-│   ├── config.toml              local Supabase stack (incl. receipts/memories buckets)
-│   ├── migrations/              SQL migrations
-│   └── seed.sql
-├── dev                          start/stop Supabase, API, and Expo
+│   └── migrations/              SQL migrations for hosted Supabase
+├── dev                          start/stop API and Expo
 ├── SETUP.md                     step-by-step setup guide
 └── docker-compose.yml
 ```
@@ -54,7 +52,7 @@ A social expense, planning and memories app. Create plans with friends, scan rec
 
 > New to the repo? Follow the step-by-step guide in [SETUP.md](SETUP.md). The summary below is the short version.
 
-Prerequisites: Node 22.13+ or 24.3+ (LTS), Docker, and Expo Go or a simulator. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) is optional; the script uses `npx supabase` when it is not installed.
+Prerequisites: Node 22.13+ or 24.3+ (LTS), Docker, and Expo Go or a simulator.
 
 ### First run for teammates
 
@@ -74,9 +72,9 @@ The script connects to the hosted Supabase project configured in `apps/mobile/.e
 
 Once Expo is ready, `./dev up` prints an **Expo Go QR code** in the terminal. Keep your phone and computer on the same Wi-Fi, then scan with Expo Go on Android or the Camera app on iOS. Each teammate's QR code points to their own computer.
 
-Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer's LAN IP on port 8000, then rerun `./dev up` if your network address changes. For optional local mode, override the detected address with `DEV_HOST=192.168.1.20 ./dev up local`.
+Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer's LAN IP on port 8000, then rerun `./dev up` if your network address changes.
 
-API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). The health endpoint at [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health) returns `{"status":"ok"}`. Expo output is saved in `.dev/expo.log`; Supabase startup output is in `.dev/supabase-start.log`.
+API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). The health endpoint at [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health) returns `{"status":"ok"}`. Expo output is saved in `.dev/expo.log`.
 
 The app currently has placeholder screens, and most feature API endpoints return `501 Not Implemented`. The default startup uses hosted Supabase; inspect data in the project’s online Supabase dashboard.
 
@@ -86,7 +84,7 @@ The app currently has placeholder screens, and most feature API endpoints return
 ./dev down  # stops Expo and FastAPI
 ```
 
-Add `GEMINI_API_KEY` to `apps/api/.env.cloud` when you need receipt scanning, then rerun `./dev up`. Keep env files and local keys out of Git. Apply migrations to the hosted project before using it. For an optional local database, run `./dev up local` and stop it with `./dev down local`.
+Add `GEMINI_API_KEY` to `apps/api/.env.cloud` when you need receipt scanning, then rerun `./dev up`. Keep env files and keys out of Git. Apply migrations to the hosted project before using it.
 
 ## Checks
 
