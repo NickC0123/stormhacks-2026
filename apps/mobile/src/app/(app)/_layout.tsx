@@ -58,6 +58,7 @@ function AppNavigator() {
             contentStyle: { backgroundColor: theme.colors.bgSurface },
           }}
         />
+        <Stack.Screen name="archive" options={{ headerShown: true, title: 'Archive', headerBackTitle: 'Back' }} />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="users/[userId]" options={{ headerShown: true, title: 'Profile', headerBackTitle: 'Back' }} />
         <Stack.Screen name="events/[eventId]/index" options={{ headerShown: false }} />

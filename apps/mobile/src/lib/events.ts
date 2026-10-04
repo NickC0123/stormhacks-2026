@@ -38,6 +38,27 @@ export function displayName(user: EventUser): string {
   return user.username ? `@${user.username}` : 'Unknown user';
 }
 
+/** Compact age like "now", "5m", "3h", "2d"; older than a week shows the date. */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`;
+  if (minutes < 60 * 24 * 7) return `${Math.floor(minutes / (60 * 24))}d`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Day number and short month for archive date badges; the year only when it isn't this year. */
+export function archiveDate(iso: string, now = new Date()): { day: string; month: string; full: string } {
+  const date = new Date(iso);
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return {
+    day: String(date.getDate()),
+    month: date.toLocaleDateString(undefined, sameYear ? { month: 'short' } : { month: 'short', year: 'numeric' }),
+    full: date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+  };
+}
+
 export function formatEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
