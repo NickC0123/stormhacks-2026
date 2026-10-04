@@ -308,14 +308,14 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const [hasReceipt, setHasReceipt] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
   /** Drawer create flow: items/receipt first, then details. */
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [manualEntry, setManualEntry] = useState(false);
   const [scanToast, setScanToast] = useState<string | null>(null);
   const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
   const splitDraft = useSplitDraft(expenseId ? null : form.event_id);
   const totals = expenseTotal(form);
   const printedTotal = receiptTotalMismatch(totals, form.parsed_receipt);
-  const totalSteps = 2;
+  const totalSteps = 3;
 
   function openReceiptPicker(options?: { scanAfter?: boolean }) {
     if (busy) return;
@@ -475,6 +475,11 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     setStep(2);
   }
 
+  function continueToStep3() {
+    if (!validateDetails()) return;
+    setStep(3);
+  }
+
   function hasEnteredItems() {
     // Empty "Enter manually" rows don't count — only real input or a receipt.
     const hasFilledItem = form.items.some(
@@ -501,7 +506,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
 
   async function save() {
     if (busy) return;
-    if (!validateItems()) return;
+    if (!validateItems() || !totals) return;
     if (!validateDetails()) return;
     if (!expenseId && splitDraft.selectedIds.length === 0) {
       setError('Choose at least one person to split this expense.');
@@ -582,12 +587,14 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   if (loadError) return <View style={styles.center}><Text style={styles.text}>{loadError}</Text><Text style={styles.text} onPress={() => router.back()}>Go back</Text></View>;
 
   const isDrawer = !expenseId;
-  // Drawer: items first (step 1), then details (step 2). Edit shows details then items.
+  // Drawer: items (step 1), details (step 2), then who splits it (step 3). Edit shows details then items.
   const showDetails = !isDrawer || step === 2;
   const showItems = !isDrawer || step === 1;
+  const showSplit = isDrawer && step === 3;
   const imageUri = asset?.uri ?? receiptUrl;
   const canContinue = Boolean(totals && totals.total !== 0);
-  const canSave = canContinue && form.title.trim().length > 0;
+  const canSave = canContinue && form.title.trim().length > 0
+    && (!isDrawer || step !== 3 || splitDraft.selectedIds.length > 0);
 
   return (
     <SafeAreaView style={styles.container} edges={isDrawer ? [] : ['left', 'right']}>
@@ -987,18 +994,18 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 </Pressable>
               </View>
             )}
-            {isDrawer ? (
-              <>
-                <View style={styles.sectionDivider} />
-                <Text style={styles.sectionLabel}>Split With</Text>
-                <SplitPicker
-                  draft={splitDraft}
-                  totalCents={Math.max(totals?.total ?? 0, 0)}
-                  currency={form.currency || 'CAD'}
-                  disabled={busy}
-                />
-              </>
-            ) : null}
+          </>
+        ) : null}
+
+        {showSplit ? (
+          <>
+            <Text style={styles.sectionLabel}>Split With</Text>
+            <SplitPicker
+              draft={splitDraft}
+              totalCents={Math.max(totals?.total ?? 0, 0)}
+              currency={form.currency || 'CAD'}
+              disabled={busy}
+            />
           </>
         ) : null}
 
@@ -1051,6 +1058,39 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
               accessibilityLabel="Back"
               disabled={busy}
               onPress={() => setStep(1)}
+              style={({ pressed }) => [
+                styles.outlineCta,
+                styles.ctaHalf,
+                pressed && !busy && styles.outlineCtaPressed,
+                busy && styles.primaryCtaDisabled,
+              ]}
+            >
+              <Text style={styles.outlineCtaText}>Back</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue"
+              accessibilityState={{ disabled: !canSave || busy }}
+              disabled={!canSave || busy}
+              onPress={continueToStep3}
+              style={({ pressed }) => [
+                styles.primaryCta,
+                styles.ctaHalf,
+                pressed && canSave && !busy && styles.primaryCtaPressed,
+                (!canSave || busy) && styles.primaryCtaDisabled,
+              ]}
+            >
+              <Text style={styles.primaryCtaText}>Continue</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {isDrawer && step === 3 ? (
+          <View style={[styles.ctaDock, styles.ctaRow]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              disabled={busy}
+              onPress={() => setStep(2)}
               style={({ pressed }) => [
                 styles.outlineCta,
                 styles.ctaHalf,
