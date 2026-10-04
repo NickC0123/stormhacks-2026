@@ -20,7 +20,9 @@ def create_event(body: EventCreate, user: CurrentUserDep) -> Event:
     if not title:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Event title is required")
     if body.member_ids:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Adding members is not supported yet")
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Adding members is not supported yet"
+        )
 
     db = get_supabase()
     db.table("profiles").upsert(
