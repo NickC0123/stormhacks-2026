@@ -1,14 +1,22 @@
 import { Tabs } from 'expo-router';
 
+import { BottomNav } from '@/components/ui/BottomNav';
+
 export default function TabsLayout() {
   return (
-    <Tabs>
-      <Tabs.Screen name="index" options={{ title: 'Plans' }} />
-      <Tabs.Screen name="events" options={{ title: 'Events' }} />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />
-      <Tabs.Screen name="balances" options={{ title: 'Balances' }} />
-      <Tabs.Screen name="dashboard" options={{ title: 'Dashboard' }} />
+    <Tabs
+      tabBar={(props) => (
+        <BottomNav state={props.state} navigation={props.navigation} />
+      )}
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Events' }} />
+      <Tabs.Screen name="expenses" options={{ title: 'Expenses' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      {/* Hidden for now — restore when Timeline returns. */}
+      <Tabs.Screen name="timeline" options={{ href: null }} />
     </Tabs>
   );
 }
