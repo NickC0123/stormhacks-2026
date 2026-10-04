@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EventInvitesAndList } from '@/components/events/EventInvitesAndList';
@@ -7,13 +8,30 @@ import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { Screen } from '@/components/ui/Screen';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useEventsHome } from '@/hooks/useEventsHome';
+import { ScrollRevealProvider, useScrollRevealNotify } from '@/hooks/useScrollReveal';
 import { useTheme, type Theme } from '@/theme';
 
 export default function EventsScreen() {
+  return (
+    <ScrollRevealProvider>
+      <EventsScreenBody />
+    </ScrollRevealProvider>
+  );
+}
+
+function EventsScreenBody() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const home = useEventsHome();
   const events = home.data?.events ?? [];
+  const [entranceKey, setEntranceKey] = useState(0);
+  const notifyReveal = useScrollRevealNotify();
+
+  useFocusEffect(
+    useCallback(() => {
+      setEntranceKey((key) => key + 1);
+    }, []),
+  );
 
   return (
     <Screen
@@ -24,6 +42,7 @@ export default function EventsScreen() {
       bottomFade
       onRefresh={home.refresh}
       refreshing={home.refreshing}
+      onScroll={notifyReveal ? () => notifyReveal() : undefined}
       headerLeft={
         // SF Symbol 􀣔 clock.arrow.circlepath
         <CircleIconButton accessibilityLabel="Photo archive" onPress={() => router.push('/archive')}>
@@ -45,15 +64,21 @@ export default function EventsScreen() {
       </View>
 
       {home.data && events.length === 0 ? (
-        <Text style={styles.empty}>No events yet. Tap + to create one, or ask a friend to invite you.</Text>
+        <Text style={styles.empty}>
+          No events yet. Tap + to create one, or ask a friend to invite you.
+        </Text>
       ) : null}
 
       <View style={styles.cards}>
-        {events.map((event) => (
+        {events.map((event, index) => (
           <EventMemoryCard
             key={event.id}
             event={event}
-            onPress={() => router.push({ pathname: '/events/[eventId]', params: { eventId: event.id } })}
+            entranceKey={entranceKey}
+            revealOnScroll={index > 0}
+            onPress={() =>
+              router.push({ pathname: '/events/[eventId]', params: { eventId: event.id } })
+            }
           />
         ))}
       </View>

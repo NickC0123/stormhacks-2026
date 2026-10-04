@@ -450,9 +450,11 @@ export const sizes = {
   bottomFade: 130,
   /** Donut chart outer diameter and ring thickness. */
   donut: 168,
-  donutStroke: 24,
-  /** Space between donut segments. */
-  donutGap: 2,
+  donutStroke: 28,
+  /** Space between donut segments (arc length at outer radius). */
+  donutGap: 3,
+  /** How far a selected slice shifts outward (Bklit-style hover translate). */
+  donutHoverOffset: 8,
   /** Legend color swatch. */
   swatch: 12,
   /** Native iOS date/time spinner wheel height. */
@@ -529,6 +531,18 @@ export const motion = {
     scale: 0.97,
     blur: 2,
     autoHideMs: 3200,
+  },
+  /** Home event memory cards — photos in a card scale in one-by-one. */
+  cardEntrance: {
+    duration: 420,
+    distance: 8,
+    /** Gap between each photo — keep overlap so the cascade feels soft. */
+    photoStagger: 110,
+    photoDuration: 520,
+    /** Very mild start scale — almost a settle, not a pop. */
+    photoScale: 0.97,
+    /** Slow ease-out (approx ease-out-quart). */
+    photoEase: [0.25, 0.46, 0.45, 0.94] as const,
   },
 } as const;
 

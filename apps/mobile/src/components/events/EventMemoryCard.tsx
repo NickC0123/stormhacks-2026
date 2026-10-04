@@ -1,6 +1,8 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AvatarStack } from '@/components/ui/AvatarStack';
+import { useScrollRevealEnter } from '@/hooks/useScrollReveal';
 import { formatEventDate } from '@/lib/events';
 import { useTheme, type Theme } from '@/theme';
 import type { EventHomeItem } from '@/types';
@@ -8,13 +10,29 @@ import type { EventHomeItem } from '@/types';
 type Props = {
   event: EventHomeItem;
   onPress: () => void;
+  /** Bump to reset and replay entrances (e.g. on tab focus). */
+  entranceKey?: number;
+  /** When true, stay hidden until scrolled into view. First card should leave this off. */
+  revealOnScroll?: boolean;
+};
+
+type PhotoSlot = {
+  key: string;
+  wrap: object;
+  angle: number;
+  photo: EventHomeItem['preview_photos'][number] | undefined;
 };
 
 /**
  * Event memory preview card from Figma Group 2 (`22:3202`):
  * fanned photo stack, title, date • memories, avatar row.
  */
-export function EventMemoryCard({ event, onPress }: Props) {
+export function EventMemoryCard({
+  event,
+  onPress,
+  entranceKey = 0,
+  revealOnScroll = false,
+}: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
   const date = formatEventDate(event.starts_at ?? event.created_at);
@@ -22,55 +40,173 @@ export function EventMemoryCard({ event, onPress }: Props) {
   const memoriesLabel =
     memoryCount === 1 ? '1 Memory' : `${memoryCount} Memories`;
   const photos = event.preview_photos.slice(0, 3);
-  // Fan order: back-right, back-left, front — front gets the first (fav/latest) photo.
-  const slots = [
-    { key: 'backRight', wrap: styles.photoBackRight, tilt: styles.photoTiltRight, photo: photos[2] },
-    { key: 'backLeft', wrap: styles.photoBackLeft, tilt: styles.photoTiltLeft, photo: photos[1] },
-    { key: 'front', wrap: styles.photoFront, tilt: styles.photoTiltFront, photo: photos[0] },
-  ] as const;
+  // Fan order: back-right, back-left, front — front gets the first (latest) photo.
+  const slots: PhotoSlot[] = [
+    { key: 'backRight', wrap: styles.photoBackRight, angle: 4, photo: photos[2] },
+    { key: 'backLeft', wrap: styles.photoBackLeft, angle: -12, photo: photos[1] },
+    { key: 'front', wrap: styles.photoFront, angle: 8, photo: photos[0] },
+  ];
   const label = `${event.title}, ${date}, ${memoriesLabel}`;
 
+  const rootRef = useRef<View>(null);
+  const chrome = useRef(new Animated.Value(0)).current;
+  const photoAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const [settled, setSettled] = useState(false);
+  const [started, setStarted] = useState(!revealOnScroll);
+  const { cardEntrance, easeTab } = theme.motion;
+
+  const playEntrance = useCallback(() => {
+    const chromeEase = Easing.bezier(...easeTab);
+    const photoEase = Easing.bezier(...cardEntrance.photoEase);
+    setStarted(true);
+    setSettled(false);
+    chrome.setValue(0);
+    photoAnims.forEach((anim) => anim.setValue(0));
+
+    Animated.parallel([
+      Animated.timing(chrome, {
+        toValue: 1,
+        duration: cardEntrance.duration,
+        delay: cardEntrance.photoStagger,
+        easing: chromeEase,
+        useNativeDriver: true,
+      }),
+      // One photo scales in, then the next, then the next — back → front.
+      Animated.stagger(
+        cardEntrance.photoStagger,
+        photoAnims.map((anim) =>
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: cardEntrance.photoDuration,
+            easing: photoEase,
+            useNativeDriver: true,
+          }),
+        ),
+      ),
+    ]).start(({ finished }) => {
+      if (finished) setSettled(true);
+    });
+  }, [chrome, photoAnims, cardEntrance, easeTab]);
+
+  useEffect(() => {
+    if (entranceKey < 1) return;
+    setSettled(false);
+    setStarted(!revealOnScroll);
+    chrome.setValue(0);
+    photoAnims.forEach((anim) => anim.setValue(0));
+    if (!revealOnScroll) playEntrance();
+  }, [chrome, photoAnims, entranceKey, revealOnScroll, playEntrance]);
+
+  const { onLayout } = useScrollRevealEnter(
+    rootRef,
+    playEntrance,
+    entranceKey,
+    revealOnScroll,
+  );
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint="Opens event"
-      style={({ pressed }) => [styles.root, pressed && styles.pressed]}
+    <View
+      ref={rootRef}
+      collapsable={false}
+      onLayout={onLayout}
+      // Later cards keep layout height but stay invisible until scrolled into view.
+      style={!started ? styles.pending : undefined}
     >
-      <View style={styles.stack}>
-        {slots.map((slot) => (
-          <View key={slot.key} style={[styles.photoWrap, slot.wrap]}>
-            <View style={[styles.photo, slot.tilt]}>
-              {slot.photo ? (
-                <Image source={{ uri: slot.photo.url }} style={styles.photoImage} />
-              ) : null}
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.title}>{event.title}</Text>
-
-      <View style={styles.meta}>
-        <Text style={styles.metaText}>{date}</Text>
-        <View style={styles.dot} />
-        <Text style={styles.metaText}>{memoriesLabel}</Text>
-      </View>
-
-      <AvatarStack
-        size="sm"
-        align="center"
-        people={event.members.map((member) => ({
-          id: member.id,
-          name: member.username ?? '?',
-          color: member.avatar_color,
-        }))}
+      <Pressable
         onPress={onPress}
-        accessibilityLabel={`${event.members.length} members`}
+        accessibilityRole="button"
+        accessibilityLabel={label}
         accessibilityHint="Opens event"
-      />
-    </Pressable>
+        style={({ pressed }) => [styles.root, pressed && styles.pressed]}
+      >
+        <View style={styles.stack}>
+          {slots.map((slot, index) => {
+            const anim = photoAnims[index];
+            return (
+              <View key={slot.key} style={[styles.photoWrap, slot.wrap]}>
+                <Animated.View
+                  style={[
+                    styles.photo,
+                    settled
+                      ? { transform: [{ rotate: `${slot.angle}deg` }] }
+                      : {
+                          // Fade most of the way early so scale can ease without a hard pop.
+                          opacity: anim.interpolate({
+                            inputRange: [0, 0.55, 1],
+                            outputRange: [0, 1, 1],
+                          }),
+                          transform: [
+                            {
+                              scale: anim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [cardEntrance.photoScale, 1],
+                              }),
+                            },
+                            // Start near the final tilt so rotation doesn’t add snap.
+                            {
+                              rotate: anim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [`${slot.angle * 0.65}deg`, `${slot.angle}deg`],
+                              }),
+                            },
+                          ],
+                        },
+                  ]}
+                >
+                  {slot.photo ? (
+                    <Image source={{ uri: slot.photo.url }} style={styles.photoImage} />
+                  ) : null}
+                </Animated.View>
+              </View>
+            );
+          })}
+        </View>
+
+        <Animated.View
+          style={[
+            styles.chrome,
+            settled
+              ? undefined
+              : {
+                  opacity: chrome,
+                  transform: [
+                    {
+                      translateY: chrome.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [cardEntrance.distance, 0],
+                      }),
+                    },
+                  ],
+                },
+          ]}
+        >
+          <Text style={styles.title}>{event.title}</Text>
+
+          <View style={styles.meta}>
+            <Text style={styles.metaText}>{date}</Text>
+            <View style={styles.dot} />
+            <Text style={styles.metaText}>{memoriesLabel}</Text>
+          </View>
+
+          <AvatarStack
+            size="sm"
+            align="center"
+            people={event.members.map((member) => ({
+              id: member.id,
+              name: member.username ?? '?',
+              color: member.avatar_color,
+            }))}
+            onPress={onPress}
+            accessibilityLabel={`${event.members.length} members`}
+            accessibilityHint="Opens event"
+          />
+        </Animated.View>
+      </Pressable>
+    </View>
   );
 }
 
@@ -82,6 +218,9 @@ function createStyles(theme: Theme) {
   const fanWidth = 361;
 
   return StyleSheet.create({
+    pending: {
+      opacity: 0,
+    },
     root: {
       width: '100%',
       alignItems: 'center',
@@ -94,6 +233,9 @@ function createStyles(theme: Theme) {
       height: 360,
       marginBottom: theme.spacing[6],
       alignSelf: 'center',
+    },
+    chrome: {
+      alignItems: 'center',
     },
     photoWrap: {
       position: 'absolute',
@@ -135,15 +277,6 @@ function createStyles(theme: Theme) {
     photoImage: {
       width: '100%',
       height: '100%',
-    },
-    photoTiltLeft: {
-      transform: [{ rotate: '-12deg' }],
-    },
-    photoTiltRight: {
-      transform: [{ rotate: '4deg' }],
-    },
-    photoTiltFront: {
-      transform: [{ rotate: '8deg' }],
     },
     title: {
       fontFamily: theme.fonts.display.medium,
