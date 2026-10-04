@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     supabase_storage_bucket_memories: str = "memories"
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     cors_origins: str = "http://localhost:8081"
 

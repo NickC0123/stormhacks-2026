@@ -29,6 +29,40 @@ export type Receipt = {
   items: ReceiptItem[];
 };
 
+export type ItemCategory =
+  | 'coffee'
+  | 'food'
+  | 'drinks'
+  | 'alcohol'
+  | 'groceries'
+  | 'transport'
+  | 'entertainment'
+  | 'shopping'
+  | 'other';
+
+/** Money values are strings with two decimals, e.g. "10.00". Keys match the API JSON exactly. */
+export type ParsedReceiptItem = {
+  description: string;
+  normalized_name: string;
+  category: ItemCategory;
+  quantity: number;
+  unit_price: string | null;
+  line_total: string;
+};
+
+export type ParsedReceipt = {
+  merchant: string | null;
+  date: string | null;
+  currency: string;
+  items: ParsedReceiptItem[];
+  subtotal: string | null;
+  discount: string;
+  tax: string | null;
+  tip: string;
+  total: string | null;
+  warnings: string[];
+};
+
 export type Balance = {
   fromUserId: UUID;
   toUserId: UUID;

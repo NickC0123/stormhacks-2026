@@ -10,7 +10,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const request = (accessToken: string) => fetch(`${env.apiUrl}/api/v1${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      // FormData bodies need fetch to set the multipart boundary itself.
+      ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...init.headers,
       Authorization: `Bearer ${accessToken}`,
     },
@@ -28,7 +29,18 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
+    throw new Error(await errorMessage(res));
   }
   return res.json() as Promise<T>;
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const { detail } = JSON.parse(text);
+    if (typeof detail === 'string') return detail;
+  } catch {
+    // Not a FastAPI JSON error; fall through to the raw body.
+  }
+  return `API ${res.status}: ${text}`;
 }
