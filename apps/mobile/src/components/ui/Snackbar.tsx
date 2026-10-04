@@ -13,11 +13,15 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FullWindowOverlay } from 'react-native-screens';
 
 import { useTheme, type Theme } from '@/theme';
 
@@ -26,6 +30,11 @@ type SnackbarVariant = 'success';
 type SnackbarRequest = {
   message: string;
   variant?: SnackbarVariant;
+  /**
+   * Show above native stack modals/drawers (Scan Expense, etc.).
+   * Uses FullWindowOverlay on iOS so the toast isn’t trapped under the drawer.
+   */
+  overModal?: boolean;
 };
 
 type SnackbarContextValue = {
@@ -54,15 +63,16 @@ export function SnackbarProvider({ children }: ProviderProps) {
     setRequest(next);
   }, []);
 
+  const dismiss = useCallback(() => {
+    setRequest(null);
+  }, []);
+
   const value = useMemo(() => ({ showSnackbar }), [showSnackbar]);
 
   return (
     <SnackbarContext.Provider value={value}>
       {children}
-      <SnackbarHost
-        request={request}
-        onDismiss={() => setRequest(null)}
-      />
+      <SnackbarHost request={request} onDismiss={dismiss} />
     </SnackbarContext.Provider>
   );
 }
@@ -80,6 +90,7 @@ function SnackbarHost({ request, onDismiss }: HostProps) {
   const [mounted, setMounted] = useState(false);
   const [message, setMessage] = useState('');
   const [variant, setVariant] = useState<SnackbarVariant>('success');
+  const [overModal, setOverModal] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const progress = useRef(new Animated.Value(0)).current;
@@ -109,6 +120,7 @@ function SnackbarHost({ request, onDismiss }: HostProps) {
 
     setMessage(request.message);
     setVariant(request.variant ?? 'success');
+    setOverModal(Boolean(request.overModal));
     setMounted(true);
 
     const [x1, y1, x2, y2] = theme.motion.easeTab;
@@ -161,6 +173,52 @@ function SnackbarHost({ request, onDismiss }: HostProps) {
 
   if (!mounted) return null;
 
+  // Above bottom nav on tabs; over drawers, sit just above the home indicator / CTAs.
+  const bottom = overModal
+    ? Math.max(insets.bottom, theme.spacing[3]) + theme.spacing[3]
+    : Math.max(insets.bottom, theme.spacing[3]) +
+      theme.spacing[3] +
+      theme.sizes.fab +
+      theme.spacing[2];
+
+  const toast = (
+    <SnackbarToast
+      message={message}
+      variant={variant}
+      progress={progress}
+      style={[styles.host, { bottom }]}
+    />
+  );
+
+  if (!overModal) {
+    return toast;
+  }
+
+  // iOS native stack modals own their own window; FullWindowOverlay draws above them.
+  if (Platform.OS === 'ios') {
+    return <FullWindowOverlay>{toast}</FullWindowOverlay>;
+  }
+
+  return (
+    <View pointerEvents="box-none" style={styles.androidOverlay}>
+      {toast}
+    </View>
+  );
+}
+
+type ToastProps = {
+  message: string;
+  variant: SnackbarVariant;
+  progress: Animated.Value;
+  style?: StyleProp<ViewStyle>;
+};
+
+/** Presentational success toast — shared by the app host and in-drawer anchors. */
+export function SnackbarToast({ message, variant, progress, style }: ToastProps) {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const isSuccess = variant === 'success';
+
   const opacity = progress;
   const translateY = progress.interpolate({
     inputRange: [0, 1],
@@ -171,17 +229,8 @@ function SnackbarHost({ request, onDismiss }: HostProps) {
     outputRange: [theme.motion.toast.scale, 1],
   });
 
-  // Match BottomNav stack: safe inset + top pad + bar/FAB height + gap above nav.
-  const bottom =
-    Math.max(insets.bottom, theme.spacing[3]) +
-    theme.spacing[3] +
-    theme.sizes.fab +
-    theme.spacing[2];
-
-  const isSuccess = variant === 'success';
-
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom }]}>
+    <View pointerEvents="box-none" style={style}>
       <Animated.View
         accessibilityLiveRegion="polite"
         accessibilityRole="text"
@@ -207,10 +256,118 @@ function SnackbarHost({ request, onDismiss }: HostProps) {
   );
 }
 
+/**
+ * Renders a snackbar inside the current screen tree (use inside native modals/drawers).
+ */
+export function InlineSnackbar({
+  message,
+  visible,
+  onHidden,
+  bottomOffset,
+}: {
+  message: string;
+  visible: boolean;
+  onHidden: () => void;
+  bottomOffset: number;
+}) {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const progress = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showId = useRef(0);
+  const onHiddenRef = useRef(onHidden);
+  onHiddenRef.current = onHidden;
+
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (alive) setReduceMotion(enabled);
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const id = ++showId.current;
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+    setMounted(true);
+
+    const [x1, y1, x2, y2] = theme.motion.easeTab;
+    const easing = Easing.bezier(x1, y1, x2, y2);
+
+    if (reduceMotion) {
+      progress.setValue(1);
+    } else {
+      progress.setValue(0);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: theme.motion.toast.openDur,
+        easing,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    hideTimer.current = setTimeout(() => {
+      if (showId.current !== id) return;
+      const finish = () => {
+        if (showId.current !== id) return;
+        setMounted(false);
+        onHiddenRef.current();
+      };
+      if (reduceMotion) {
+        progress.setValue(0);
+        finish();
+        return;
+      }
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: theme.motion.toast.closeDur,
+        easing,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) finish();
+      });
+    }, theme.motion.toast.autoHideMs);
+
+    return () => {
+      if (hideTimer.current) {
+        clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+    };
+  }, [visible, message, reduceMotion, theme, progress]);
+
+  if (!mounted) return null;
+
+  return (
+    <SnackbarToast
+      message={message}
+      variant="success"
+      progress={progress}
+      style={[styles.host, { bottom: bottomOffset }]}
+    />
+  );
+}
+
 function createStyles(theme: Theme) {
   const s = theme.snackbar;
 
   return StyleSheet.create({
+    androidOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 1000,
+      elevation: 1000,
+    },
     host: {
       position: 'absolute',
       left: theme.sizes.navPaddingX,

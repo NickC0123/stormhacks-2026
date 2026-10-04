@@ -197,9 +197,9 @@ Put this in `styles/tokens.css` and import it once at the app root.
   --space-3:  0.75rem;  /* 12 */
   --space-4:  1rem;     /* 16 */
   --space-5:  1.25rem;  /* 20 */
-  --space-6:  1.5rem;   /* 24 */
+  --space-6:  1.5rem;   /* 24 — page / drawer horizontal padding */
   --space-8:  2rem;     /* 32 */
-  --space-9:  2.25rem;  /* 36 — page content horizontal padding */
+  --space-9:  2.25rem;  /* 36 */
   --space-10: 2.5rem;   /* 40 */
   --space-12: 3rem;     /* 48 */
   --space-16: 4rem;     /* 64 */
