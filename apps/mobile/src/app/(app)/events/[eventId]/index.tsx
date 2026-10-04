@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { EventPhotos } from '@/components/events/EventPhotos';
 import { FriendRow } from '@/components/friends/FriendRow';
 import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
@@ -50,6 +51,8 @@ export default function EventScreen() {
             onPress={() => router.push({ pathname: '/events/[eventId]/receipts/scan', params: { eventId } })}
           />
         </View>
+
+        <EventPhotos eventId={eventId} />
 
         <ListGroup title="Members" count={event.members.length}>
           {event.members.map((member) => {

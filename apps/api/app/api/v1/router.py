@@ -11,6 +11,7 @@ from app.api.v1.routes import (
     invites,
     me,
     memories,
+    photos,
     receipts,
     users,
 )
@@ -27,4 +28,5 @@ api_router.include_router(expenses.router)
 api_router.include_router(expense_people.router)
 api_router.include_router(balances.router)
 api_router.include_router(memories.router)
+api_router.include_router(photos.router)
 api_router.include_router(dashboard.router)
