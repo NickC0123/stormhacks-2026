@@ -105,6 +105,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
 export const spacing = {
   0: 0,
   1: 4,
+  1.5: 6,
   2: 8,
   3: 12,
   4: 16,
@@ -193,6 +194,14 @@ export const shadows = {
     shadowRadius: 7.1,
     elevation: 6,
   } satisfies ShadowToken,
+  /** Soft lift for fanned event memory photos. */
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  } satisfies ShadowToken,
 } as const;
 
 export const sizes = {
@@ -201,9 +210,12 @@ export const sizes = {
   iconLg: 24,
   touchTarget: 44,
   fab: 52,
+  /** Create FAB plus mark size / stroke weight. */
+  fabPlus: 16,
+  fabPlusStroke: 2.5,
   navBarHeight: 52,
-  /** Floating bottom nav inset from screen edges (Figma: 14px). */
-  navPaddingX: 14,
+  /** Floating bottom nav inset from screen edges. */
+  navPaddingX: 24,
 } as const;
 
 /** Motion tokens (matches design-spec `--duration-*` / transitions.dev). */

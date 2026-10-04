@@ -1,4 +1,5 @@
 import {
+  Inter_300Light,
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
@@ -20,6 +21,7 @@ import { ThemeProvider } from '@/theme';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
+    Inter_300Light,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,

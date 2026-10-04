@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -54,6 +53,9 @@ type TabLayout = {
   height: number;
 };
 
+/** Set true to show SF Symbol icons beside tab labels. */
+const SHOW_TAB_ICONS = false;
+
 const TABS: TabItem[] = [
   {
     key: 'index',
@@ -80,7 +82,6 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
-  const iconSize = theme.typography.label.fontSize;
 
   const activeRoute = state.routes[state.index]?.name as TabKey | undefined;
 
@@ -200,16 +201,20 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
                 }}
                 style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
               >
-                <Image
-                  source={tab.source}
-                  style={{
-                    width: iconSize,
-                    height: iconSize,
-                    tintColor: color,
-                  }}
-                  resizeMode="contain"
-                />
-                <Text style={[styles.label, { color }]}>{tab.label}</Text>
+                {SHOW_TAB_ICONS ? (
+                  <Image
+                    source={tab.source}
+                    style={{
+                      width: theme.typography.label.fontSize,
+                      height: theme.typography.label.fontSize,
+                      tintColor: color,
+                    }}
+                    resizeMode="contain"
+                  />
+                ) : null}
+                <Text style={[styles.label, focused && styles.labelSelected, { color }]}>
+                  {tab.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -221,7 +226,10 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
           onPress={() => setCreateOpen(true)}
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         >
-          <Ionicons name="add" size={theme.sizes.iconLg} color={theme.colors.onAccent} />
+          <View style={styles.plus}>
+            <View style={[styles.plusBar, styles.plusHorizontal]} />
+            <View style={[styles.plusBar, styles.plusVertical]} />
+          </View>
         </Pressable>
       </View>
 
@@ -238,7 +246,7 @@ function createStyles(theme: Theme) {
       right: 0,
       bottom: 0,
       paddingTop: theme.spacing[3],
-      paddingHorizontal: theme.sizes.navPaddingX, // 14
+      paddingHorizontal: theme.sizes.navPaddingX,
     },
     row: {
       flexDirection: 'row',
@@ -270,7 +278,7 @@ function createStyles(theme: Theme) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: theme.spacing[1], // 4
+      gap: theme.spacing[1.5], // 6 — icon to label
       minHeight: theme.sizes.touchTarget,
       paddingHorizontal: theme.spacing[4], // 16
       paddingVertical: theme.spacing[3], // 12
@@ -282,6 +290,11 @@ function createStyles(theme: Theme) {
     },
     label: {
       ...theme.typography.label,
+      fontFamily: theme.fonts.sans.regular,
+      fontWeight: undefined,
+    },
+    labelSelected: {
+      fontFamily: theme.fonts.sans.semibold,
     },
     fab: {
       width: theme.sizes.fab,
@@ -294,6 +307,25 @@ function createStyles(theme: Theme) {
     },
     fabPressed: {
       backgroundColor: theme.colors.accentActive,
+    },
+    plus: {
+      width: theme.sizes.fabPlus,
+      height: theme.sizes.fabPlus,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    plusBar: {
+      position: 'absolute',
+      backgroundColor: theme.colors.onAccent,
+      borderRadius: theme.radius.full,
+    },
+    plusHorizontal: {
+      width: theme.sizes.fabPlus,
+      height: theme.sizes.fabPlusStroke,
+    },
+    plusVertical: {
+      width: theme.sizes.fabPlusStroke,
+      height: theme.sizes.fabPlus,
     },
   });
 }

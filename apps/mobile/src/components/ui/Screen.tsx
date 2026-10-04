@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme, type Theme } from '@/theme';
@@ -31,17 +31,24 @@ export function Screen({
 
   return (
     <SafeAreaView
-      style={[
-        styles.container,
-        titleVariant === 'page' && styles.containerPage,
-      ]}
+      style={styles.container}
       edges={['top', 'left', 'right']}
     >
-      <View style={styles.header}>
-        <Text style={[titleStyle, { color }]}>{title}</Text>
-        {description ? <Text style={styles.description}>{description}</Text> : null}
-      </View>
-      {children}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          titleVariant === 'page' && styles.contentPage,
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Text style={[titleStyle, { color }]}>{title}</Text>
+          {description ? <Text style={styles.description}>{description}</Text> : null}
+        </View>
+        {children}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -50,13 +57,18 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: theme.colors.bgPage,
+    },
+    scroll: {
+      flex: 1,
+    },
+    content: {
       paddingHorizontal: theme.spacing[9], // 36 — page content, not navbar
       paddingTop: theme.spacing[4],
       // Room for the floating bottom nav + FAB.
       paddingBottom: theme.sizes.fab + theme.spacing[10],
-      backgroundColor: theme.colors.bgPage,
     },
-    containerPage: {
+    contentPage: {
       // Drop hero titles (Events) down 48px from the safe area.
       paddingTop: theme.spacing[12],
     },
