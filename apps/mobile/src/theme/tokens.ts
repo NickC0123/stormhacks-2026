@@ -26,6 +26,12 @@ export const primitives = {
   red500: '#ef4444',
   red600: '#dc2626',
   red700: '#b91c1c',
+  /** Success snackbar (Figma `22:3938`) — emerald. */
+  emerald100: '#d1fae5',
+  emerald300: '#6ee7b7',
+  emerald700: '#047857',
+  /** Opaque success surface for dark mode. */
+  emerald900: '#064e3b',
   iosGray6: '#f2f2f7',
   iosGray6Dark: '#1c1c1e',
   glyphPrimary: '#595959',
@@ -41,6 +47,8 @@ export type ThemeColors = {
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  /** Placeholder / hint text — lighter than tertiary. */
+  textPlaceholder: string;
   textInverse: string;
   textDisabled: string;
   borderSubtle: string;
@@ -64,6 +72,9 @@ export type ThemeColors = {
   navItemActiveBg: string;
   navItemActive: string;
   navItemInactive: string;
+  /** Success snackbar surface + label/icon (Figma). */
+  successSubtle: string;
+  success: string;
 };
 
 export function createColors(scheme: ColorScheme): ThemeColors {
@@ -76,6 +87,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       textPrimary: primitives.gray50,
       textSecondary: primitives.gray300,
       textTertiary: primitives.gray400,
+      textPlaceholder: primitives.gray500,
       textInverse: primitives.gray900,
       textDisabled: primitives.gray600,
       borderSubtle: primitives.gray800,
@@ -96,6 +108,8 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       navItemActiveBg: primitives.gray700,
       navItemActive: primitives.teal400,
       navItemInactive: primitives.gray400,
+      successSubtle: primitives.emerald900,
+      success: primitives.emerald300,
     };
   }
 
@@ -107,6 +121,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     textPrimary: primitives.gray900,
     textSecondary: primitives.gray600,
     textTertiary: primitives.gray500,
+    textPlaceholder: primitives.gray400,
     textInverse: primitives.gray0,
     textDisabled: primitives.gray400,
     borderSubtle: primitives.gray200,
@@ -127,6 +142,8 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     navItemActiveBg: primitives.gray0,
     navItemActive: primitives.teal500,
     navItemInactive: primitives.glyphPrimary,
+    successSubtle: primitives.emerald100,
+    success: primitives.emerald700,
   };
 }
 
@@ -159,13 +176,13 @@ export const radius = {
 } as const;
 
 export const typography = {
-  /** Page hero title — Inter 48 / semibold (Events, etc.). */
+  /** Page hero title — Inter 32 / semibold, centered (Events, Figma `27:4262`). */
   pageTitle: {
     fontFamily: fonts.sans.semibold,
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 32,
+    lineHeight: 38,
     // -3% tracking → fontSize * -0.03 (RN letterSpacing is in px)
-    letterSpacing: 48 * -0.03,
+    letterSpacing: 32 * -0.03,
   } satisfies TextStyle,
   h1: {
     fontFamily: fonts.sans.bold,
@@ -266,13 +283,23 @@ export const sizes = {
   controlLg: 48,
   avatarMd: 40,
   borderWidth: 1,
-  fab: 52,
-  /** Create FAB plus mark size / stroke weight. */
+  /** Circular icon buttons (header + search) — Figma Large Bordered Prominent = 50. */
+  fab: 50,
+  /** Plus / search mark size / stroke weight inside circle buttons. */
   fabPlus: 16,
   fabPlusStroke: 2.5,
+  fabIcon: 22,
   navBarHeight: 52,
   /** Floating bottom nav inset from screen edges. */
   navPaddingX: 24,
+  /** Bottom content fade height (Figma Events scrim ~130). */
+  bottomFade: 130,
+} as const;
+
+export const opacity = {
+  disabled: 0.5,
+  /** Peak opacity for the Events bottom content fade. */
+  bottomFade: 0.55,
 } as const;
 
 /** Motion tokens (matches design-spec `--duration-*` / transitions.dev). */
@@ -283,17 +310,41 @@ export const motion = {
     normal: 250,
     slow: 400,
   },
-  /** cubic-bezier(0.22, 1, 0.36, 1) — tabs + modal */
+  /** cubic-bezier(0.22, 1, 0.36, 1) — tabs + panel reveal */
   easeTab: [0.22, 1, 0.36, 1] as const,
+  /**
+   * transitions.dev Panel reveal — translateY + opacity (+ blur on web).
+   * Travel = panelHeight * translateYRatio so a short move still reads as full open/close.
+   */
   modal: {
-    openDur: 250,
-    closeDur: 150,
-    scale: 0.96,
+    openDur: 400,
+    closeDur: 350,
+    translateYRatio: 0.5,
+    /** Approximate create-action panel height before / without layout (Figma ~187). */
+    panelHeight: 187,
+    /** CSS filter blur amount; not applied on native RN views. */
+    blur: 2,
+  },
+  /**
+   * transitions.dev Toast open / close — rise + fade + scale (+ blur on web).
+   */
+  toast: {
+    openDur: 350,
+    closeDur: 250,
+    distance: 16,
+    scale: 0.97,
+    blur: 2,
+    autoHideMs: 3200,
   },
 } as const;
 
-export const opacity = {
-  disabled: 0.5,
+/** Success snackbar geometry from Figma `22:3938`. */
+export const snackbar = {
+  paddingX: 16,
+  paddingY: 12,
+  gap: 10,
+  iconSize: 24,
+  radius: 4,
 } as const;
 
 /** Create-action alert geometry from Figma Alert `11:2077`. */
@@ -317,9 +368,10 @@ export type Theme = {
   typography: typeof typography;
   shadows: typeof shadows;
   sizes: typeof sizes;
-  motion: typeof motion;
   opacity: typeof opacity;
+  motion: typeof motion;
   createActionModal: typeof createActionModal;
+  snackbar: typeof snackbar;
 };
 
 export function createTheme(scheme: ColorScheme): Theme {
@@ -332,8 +384,9 @@ export function createTheme(scheme: ColorScheme): Theme {
     typography,
     shadows,
     sizes,
-    motion,
     opacity,
+    motion,
     createActionModal,
+    snackbar,
   };
 }

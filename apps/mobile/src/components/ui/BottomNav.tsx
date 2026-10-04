@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CreateActionModal } from '@/components/ui/CreateActionModal';
+import { CircleIconButton } from '@/components/ui/CircleIconButton';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useTheme, type Theme } from '@/theme';
 
 type TabKey = 'index' | 'expenses' | 'profile';
@@ -77,7 +78,7 @@ const TABS: TabItem[] = [
   },
 ];
 
-/** Floating pill tab bar + create FAB from the Figma bottom nav. */
+/** Floating pill tab bar + search (Figma `27:4262`). */
 export function BottomNav({ state, navigation }: BottomNavProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -88,7 +89,6 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
   const layouts = useRef<Partial<Record<TabKey, TabLayout>>>({});
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
   const hasPositioned = useRef(false);
 
   const pillX = useRef(new Animated.Value(0)).current;
@@ -220,20 +220,11 @@ export function BottomNav({ state, navigation }: BottomNavProps) {
           })}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add"
-          onPress={() => setCreateOpen(true)}
-          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        >
-          <View style={styles.plus}>
-            <View style={[styles.plusBar, styles.plusHorizontal]} />
-            <View style={[styles.plusBar, styles.plusVertical]} />
-          </View>
-        </Pressable>
+        {/* SF Symbol 􀊫 magnifyingglass — search UI TBD */}
+        <CircleIconButton accessibilityLabel="Search events" onPress={() => {}}>
+          <SFSymbolIcon name="magnifyingglass" />
+        </CircleIconButton>
       </View>
-
-      <CreateActionModal visible={createOpen} onClose={() => setCreateOpen(false)} />
     </View>
   );
 }
@@ -295,37 +286,6 @@ function createStyles(theme: Theme) {
     },
     labelSelected: {
       fontFamily: theme.fonts.sans.semibold,
-    },
-    fab: {
-      width: theme.sizes.fab,
-      height: theme.sizes.fab,
-      borderRadius: theme.radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.accent,
-      ...theme.shadows.fab,
-    },
-    fabPressed: {
-      backgroundColor: theme.colors.accentActive,
-    },
-    plus: {
-      width: theme.sizes.fabPlus,
-      height: theme.sizes.fabPlus,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    plusBar: {
-      position: 'absolute',
-      backgroundColor: theme.colors.onAccent,
-      borderRadius: theme.radius.full,
-    },
-    plusHorizontal: {
-      width: theme.sizes.fabPlus,
-      height: theme.sizes.fabPlusStroke,
-    },
-    plusVertical: {
-      width: theme.sizes.fabPlusStroke,
-      height: theme.sizes.fabPlus,
     },
   });
 }

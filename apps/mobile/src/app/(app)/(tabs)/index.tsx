@@ -1,8 +1,11 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { EventInvitesAndList } from '@/components/events/EventInvitesAndList';
 import { EventMemoryCard } from '@/components/events/EventMemoryCard';
+import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { Screen } from '@/components/ui/Screen';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useEventsHome } from '@/hooks/useEventsHome';
 import { useTheme, type Theme } from '@/theme';
 
@@ -16,8 +19,25 @@ export default function EventsScreen() {
       title="Events"
       titleVariant="page"
       titleColor="accent"
+      titleAlign="center"
+      bottomFade
       onRefresh={home.refresh}
       refreshing={home.refreshing}
+      headerLeft={
+        // SF Symbol 􀣔 clock.arrow.circlepath
+        <CircleIconButton accessibilityLabel="History" onPress={() => {}}>
+          <SFSymbolIcon name="clock.arrow.circlepath" />
+        </CircleIconButton>
+      }
+      headerRight={
+        // SF Symbol: plus — opens Add Event drawer directly
+        <CircleIconButton
+          accessibilityLabel="Add Event"
+          onPress={() => router.push('/events/new')}
+        >
+          <SFSymbolIcon name="plus" />
+        </CircleIconButton>
+      }
     >
       <View style={styles.list}>
         <EventInvitesAndList home={home} />
@@ -41,7 +61,7 @@ function createStyles(theme: Theme) {
     cards: {
       flexDirection: 'column',
       gap: theme.spacing[12],
-      marginTop: theme.spacing[12],
+      marginTop: theme.spacing[10],
     },
   });
 }
