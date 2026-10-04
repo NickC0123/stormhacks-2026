@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
-import type { BalanceDashboard, Expense, ExpenseWrite, ItemCategory, ParsedReceipt, SpendingSummary } from '@/types';
+import type { BalanceDashboard, Expense, ExpenseItem, ExpenseWrite, ItemCategory, ParsedReceipt, SpendingSummary } from '@/types';
 
 import { apiFetch } from './api';
 
@@ -77,6 +77,34 @@ export function toCents(value: string | null | undefined): number | null {
 export function formatCents(cents: number) {
   const abs = Math.abs(cents);
   return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+}
+
+/** Quantity in thousandths, treating a blank quantity as 1; null if it is not a positive number. */
+function quantityThousandths(quantity: ExpenseItem['quantity']): number | null {
+  const text = String(quantity ?? '').trim() || '1';
+  const match = /^(\d{1,7})(?:\.(\d{1,3}))?$/.exec(text);
+  if (!match) return null;
+  const value = Number(match[1]) * 1000 + Number((match[2] ?? '').padEnd(3, '0'));
+  return value > 0 ? value : null;
+}
+
+/** The price for one unit shown in the editor: the saved unit price, else line total ÷ quantity. */
+export function itemUnitPrice(item: ExpenseItem): string {
+  if (item.unit_price != null) return item.unit_price;
+  const cents = toCents(item.amount);
+  const thousandths = quantityThousandths(item.quantity);
+  if (cents === null || thousandths === null) return item.amount;
+  const unit = (cents * 1000) / thousandths;
+  return formatCents(Math.sign(unit) * Math.round(Math.abs(unit)));
+}
+
+/** Line total for a unit price and quantity, rounded to the cent; '' while either is incomplete. */
+export function lineAmount(unitPrice: string, quantity: ExpenseItem['quantity']): string {
+  const cents = toCents(unitPrice);
+  const thousandths = quantityThousandths(quantity);
+  if (cents === null || thousandths === null) return '';
+  const total = (cents * thousandths) / 1000;
+  return formatCents(Math.sign(total) * Math.round(Math.abs(total)));
 }
 
 export type ExpenseTotal = { subtotal: number; discount: number; tax: number; tip: number; total: number };

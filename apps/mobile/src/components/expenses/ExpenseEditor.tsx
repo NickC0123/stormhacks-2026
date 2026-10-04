@@ -25,7 +25,7 @@ import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
-import { attachExpenseReceipt, categoryLabels, deleteExpense, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
+import { attachExpenseReceipt, categoryLabels, deleteExpense, expenseTotal, formatCents, getExpense, itemUnitPrice, lineAmount, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
 import { useTheme, type Theme } from '@/theme';
 import type { ExpenseItem, ExpenseWrite, ItemCategory } from '@/types';
@@ -385,6 +385,19 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     setForm((current) => ({ ...current, items: current.items.map((item, i) => i === index ? { ...item, ...patch } : item) }));
   }
 
+  /** Editing price or quantity keeps the line total equal to price × quantity. */
+  function editPricing(index: number, patch: { unit_price?: string; quantity?: string }) {
+    setForm((current) => ({
+      ...current,
+      items: current.items.map((item, i) => {
+        if (i !== index) return item;
+        const unitPrice = patch.unit_price ?? itemUnitPrice(item);
+        const quantity = patch.quantity ?? item.quantity;
+        return { ...item, quantity, unit_price: unitPrice, amount: lineAmount(unitPrice, quantity) };
+      }),
+    }));
+  }
+
   async function readReceipt(source = asset) {
     if (!source || busy) return;
     setBusy(true);
@@ -474,8 +487,12 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     if (busy) return;
     if (!validateStep1()) return;
     if (!/^[A-Z]{3}$/.test(form.currency)) { setError('Enter a three-letter currency, such as CAD or CHF.'); return; }
-    if (form.items.some((item) => !item.name.trim() || !itemMoneyPattern.test(item.amount))) {
-      setError('Each item needs a name and an amount with up to two decimal places.'); return;
+    if (form.items.some((item) => (
+      !item.name.trim()
+      || !itemMoneyPattern.test(item.amount)
+      || (item.unit_price != null && !itemMoneyPattern.test(item.unit_price))
+    ))) {
+      setError('Each item needs a name and a price with up to two decimal places.'); return;
     }
     if (form.items.some((item) => !validQuantity(item.quantity))) {
       setError('Each item quantity must be greater than zero, with up to three decimal places.'); return;
@@ -721,6 +738,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 {form.items.map((item, index) => {
                   const categoryLabel = categories.find((category) => category.value === item.category)?.label ?? 'Category';
                   const quantityValue = item.quantity === undefined || item.quantity === null ? '' : String(item.quantity);
+                  const unitPrice = itemUnitPrice(item);
+                  const showLineTotal = Boolean(item.amount) && quantityValue !== '' && Number(quantityValue) !== 1;
                   return (
                     <View key={item.id ?? index} style={styles.item}>
                       <View style={styles.itemHeader}>
@@ -763,7 +782,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                             <TextInput
                               accessibilityLabel={`Item ${index + 1} quantity`}
                               value={quantityValue}
-                              onChangeText={(quantity) => editItem(index, { quantity, unit_price: null })}
+                              onChangeText={(quantity) => editPricing(index, { quantity })}
                               editable={!busy}
                               keyboardType="decimal-pad"
                               placeholder="Qty"
@@ -773,24 +792,29 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                           </View>
                           <View style={styles.amountControl}>
                             <Text
-                              style={[styles.amountPrefix, !item.amount && styles.amountPrefixPlaceholder]}
+                              style={[styles.amountPrefix, !unitPrice && styles.amountPrefixPlaceholder]}
                               accessibilityElementsHidden
                               importantForAccessibility="no"
                             >
                               $
                             </Text>
                             <TextInput
-                              accessibilityLabel={`Item ${index + 1} amount`}
-                              value={item.amount}
-                              onChangeText={(amount) => editItem(index, { amount, unit_price: null })}
+                              accessibilityLabel={`Item ${index + 1} price each`}
+                              value={unitPrice}
+                              onChangeText={(price) => editPricing(index, { unit_price: price })}
                               editable={!busy}
                               keyboardType="decimal-pad"
-                              placeholder="0.00"
+                              placeholder="0.00 each"
                               placeholderTextColor={theme.colors.textTertiary}
                               style={styles.amountInput}
                             />
                           </View>
                         </View>
+                        {showLineTotal ? (
+                          <Text style={styles.lineTotal}>
+                            {quantityValue} × {unitPrice} = {item.amount}
+                          </Text>
+                        ) : null}
                         <NativeSelect
                           value={
                             item.category === 'other' && !item.name.trim() && !item.amount && !quantityValue
@@ -1389,6 +1413,7 @@ function createStyles(theme: Theme) {
     itemRemovePressed: {
       opacity: 0.7,
     },
+    lineTotal: { ...theme.typography.bodySm, color: theme.colors.textSecondary, textAlign: 'right' },
     quantityControl: {
       borderWidth: theme.sizes.borderWidth,
       borderColor: theme.colors.borderSubtle,
