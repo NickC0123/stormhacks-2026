@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import Depends
 from postgrest.exceptions import APIError
 
+from app.core.avatar_color import random_avatar_color
 from app.db.supabase import get_supabase
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9_]{3,20}$")
@@ -65,7 +66,14 @@ class FriendsRepo:
                 return updated[0]
             return (
                 self.db.table("profiles")
-                .insert({"id": user_id, "username": username, "display_name": username})
+                .insert(
+                    {
+                        "id": user_id,
+                        "username": username,
+                        "display_name": username,
+                        "avatar_color": random_avatar_color(),
+                    }
+                )
                 .execute()
                 .data[0]
             )

@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.core.avatar_color import AvatarColor
+
 ContactKind = Literal["instagram", "facebook", "whatsapp", "etransfer_email", "etransfer_phone"]
 CONTACT_KINDS: tuple[ContactKind, ...] = (
     "instagram",
@@ -17,6 +19,7 @@ class Profile(BaseModel):
     id: UUID
     username: str | None = None
     display_name: str
+    avatar_color: AvatarColor
 
 
 class UsernameUpdate(BaseModel):
@@ -45,4 +48,5 @@ class PublicProfile(BaseModel):
 
     id: UUID
     username: str | None = None
+    avatar_color: AvatarColor
     contacts: list[Contact]

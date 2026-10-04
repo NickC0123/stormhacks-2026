@@ -17,6 +17,8 @@ type TitleVariant = 'default' | 'page';
 type Props = {
   title: string;
   description?: string;
+  /** Second line under description (e.g. event body under the date). */
+  detail?: string;
   /** `page` = Inter 32 semibold hero title (e.g. Events). */
   titleVariant?: TitleVariant;
   /** When set, overrides the default title color (e.g. accent teal). */
@@ -39,6 +41,7 @@ type Props = {
 export function Screen({
   title,
   description,
+  detail,
   titleVariant = 'default',
   titleColor = 'default',
   titleAlign = 'left',
@@ -58,6 +61,7 @@ export function Screen({
     titleColor === 'accent' ? theme.colors.accent : theme.colors.textPrimary;
   const centered = titleAlign === 'center';
   const hasChrome = Boolean(headerLeft || headerRight);
+  const hasMeta = Boolean(description || detail);
 
   return (
     <SafeAreaView
@@ -92,17 +96,17 @@ export function Screen({
                 titleVariant === 'page' && styles.topBarPage,
               ]}
             >
+              {/* Absolutely centered so a lone back button doesn’t shift the title. */}
+              <View style={styles.topBarTitleWrap} pointerEvents="none">
+                <Text
+                  style={[titleStyle, styles.topBarTitle, { color }]}
+                  numberOfLines={1}
+                >
+                  {title}
+                </Text>
+              </View>
               <View style={styles.side}>{headerLeft}</View>
-              <Text
-                style={[
-                  titleStyle,
-                  styles.topBarTitle,
-                  { color, textAlign: 'center' },
-                ]}
-                numberOfLines={1}
-              >
-                {title}
-              </Text>
+              <View style={styles.sideSpacer} />
               <View style={[styles.side, styles.sideRight]}>{headerRight}</View>
             </View>
           ) : (
@@ -111,10 +115,22 @@ export function Screen({
                 {title}
               </Text>
               {description ? <Text style={styles.description}>{description}</Text> : null}
+              {detail ? <Text style={styles.description}>{detail}</Text> : null}
             </View>
           )}
-          {hasChrome && description ? (
-            <Text style={styles.description}>{description}</Text>
+          {hasChrome && hasMeta ? (
+            <View style={[styles.meta, centered && styles.metaCentered]}>
+              {description ? (
+                <Text style={[styles.description, centered && styles.descriptionCentered]}>
+                  {description}
+                </Text>
+              ) : null}
+              {detail ? (
+                <Text style={[styles.description, centered && styles.descriptionCentered]}>
+                  {detail}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           {children}
         </ScrollView>
@@ -183,12 +199,23 @@ function createStyles(theme: Theme) {
       width: theme.sizes.fab,
       alignItems: 'flex-start',
       justifyContent: 'center',
+      zIndex: 1,
     },
     sideRight: {
       alignItems: 'flex-end',
     },
-    topBarTitle: {
+    sideSpacer: {
       flex: 1,
+    },
+    topBarTitleWrap: {
+      ...StyleSheet.absoluteFill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      // Keep clear of the circular header controls.
+      paddingHorizontal: theme.sizes.navPaddingX + theme.sizes.fab,
+    },
+    topBarTitle: {
+      textAlign: 'center',
     },
     content: {
       paddingHorizontal: theme.sizes.pagePaddingX,
@@ -207,6 +234,15 @@ function createStyles(theme: Theme) {
     header: {
       gap: theme.spacing[1],
     },
+    /** Date / detail under the chrome bar; left-aligned to page padding. */
+    meta: {
+      gap: theme.spacing[1],
+      marginTop: theme.spacing[4], // 16 below header bar
+      alignItems: 'flex-start',
+    },
+    metaCentered: {
+      alignItems: 'center',
+    },
     title: {
       ...theme.typography.h2,
       color: theme.colors.textPrimary,
@@ -217,6 +253,9 @@ function createStyles(theme: Theme) {
     description: {
       ...theme.typography.bodySm,
       color: theme.colors.textSecondary,
+    },
+    descriptionCentered: {
+      textAlign: 'center',
     },
   });
 }

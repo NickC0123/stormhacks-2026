@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.auth import CurrentUser, get_current_user
+from app.core.avatar_color import random_avatar_color
 from app.main import app
 from app.services.friends import DuplicateFriendshipError, FriendsRepo, UsernameTakenError
 
@@ -21,7 +22,12 @@ class FakeRepo(FriendsRepo):
         self.friendships: dict[str, dict] = {}
 
     def add_profile(self, user_id: str, username: str | None) -> None:
-        self.profiles[user_id] = {"id": user_id, "username": username, "display_name": "x"}
+        self.profiles[user_id] = {
+            "id": user_id,
+            "username": username,
+            "display_name": "x",
+            "avatar_color": random_avatar_color(),
+        }
 
     def get_profile(self, user_id):
         return self.profiles.get(user_id)
@@ -37,9 +43,17 @@ class FakeRepo(FriendsRepo):
         if owner and owner["id"] != user_id:
             raise UsernameTakenError
         profile = self.profiles.setdefault(
-            user_id, {"id": user_id, "username": None, "display_name": username}
+            user_id,
+            {
+                "id": user_id,
+                "username": None,
+                "display_name": username,
+                "avatar_color": random_avatar_color(),
+            },
         )
         profile["username"] = username
+        if "avatar_color" not in profile:
+            profile["avatar_color"] = random_avatar_color()
         return profile
 
     def get_friendship(self, friendship_id):
@@ -177,10 +191,12 @@ def test_username_setup(repo: FakeRepo) -> None:
     sign_in(CAROL)
     me = client.get("/api/v1/me").json()
     assert me["username"] is None
+    assert me["avatar_color"]
 
     res = client.put("/api/v1/me/username", json={"username": "  Carol_99 "})
     assert res.status_code == 200
     assert res.json()["username"] == "carol_99"
+    assert res.json()["avatar_color"]
     assert client.get("/api/v1/me").json()["username"] == "carol_99"
 
 

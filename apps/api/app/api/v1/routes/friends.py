@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Response, status
 
 from app.core.auth import CurrentUserDep
+from app.core.avatar_color import coerce_avatar_color
 from app.schemas.friend import FriendRequestCreate, Friendship, FriendsOverview, FriendUser
 from app.services.friends import (
     DuplicateFriendshipError,
@@ -20,9 +21,14 @@ def other_user_id(row: dict[str, Any], user_id: str) -> str:
 
 
 def to_friendship(row: dict[str, Any], other: dict[str, Any]) -> Friendship:
+    other_id = str(other["id"])
     return Friendship(
         id=row["id"],
-        user=FriendUser(id=other["id"], username=other["username"]),
+        user=FriendUser(
+            id=other["id"],
+            username=other["username"],
+            avatar_color=coerce_avatar_color(other.get("avatar_color"), user_id=other_id),
+        ),
         status=row["status"],
         created_at=row["created_at"],
         accepted_at=row.get("accepted_at"),

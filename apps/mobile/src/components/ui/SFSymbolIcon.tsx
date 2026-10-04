@@ -44,6 +44,10 @@ export function SFSymbolIcon({ name, size, color }: Props) {
     return <Ionicons name="close" size={iconSize} color={tint} />;
   }
 
+  if (name === 'chevron.left') {
+    return <Ionicons name="chevron-back" size={iconSize} color={tint} />;
+  }
+
   if (name === 'chevron.down') {
     return <Ionicons name="chevron-down" size={iconSize} color={tint} />;
   }

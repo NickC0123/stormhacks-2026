@@ -77,6 +77,7 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
         const creator = member.id === people.created_by;
         const me = member.id === profile?.id;
         return <FriendRow key={member.id} username={member.username ?? 'unknown'}
+          avatarColor={member.avatar_color}
           subtitle={split
             ? `${me ? 'You · ' : ''}${split.currency} ${split.shares.find((share) => share.user.id === member.id)?.amount ?? '0.00'}`
             : creator ? 'Creator' : me ? 'You' : undefined}
@@ -90,6 +91,7 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
     </ListGroup>
     {people.invites.length ? <ListGroup title="Pending invitations" count={people.invites.length}>
       {people.invites.map((invite) => <FriendRow key={invite.id} username={invite.user.username ?? 'unknown'}
+        avatarColor={invite.user.avatar_color}
         subtitle="Waiting for acceptance" actions={<Button label="Cancel" size="sm" variant="ghost"
           loading={busyIds.has(invite.id)} accessibilityLabel={`Cancel invitation for ${displayName(invite.user)}`}
           onPress={() => run(invite.id, () => cancelPeopleInvite(kind, invite.id), 'Could not cancel invitation')} />} />)}
@@ -97,7 +99,8 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
     <ListGroup title="Your friends" count={friends.friends.length} emptyText="Add people by username above.">
       {friends.friends.map(({ user }) => {
         const member = memberIds.has(user.id);
-        return <FriendRow key={user.id} username={user.username} subtitle={member ? 'Already a member' : 'Added immediately'}
+        return <FriendRow key={user.id} username={user.username} avatarColor={user.avatar_color}
+          subtitle={member ? 'Already a member' : 'Added immediately'}
           actions={<Button label={member ? 'Added' : 'Add'} size="sm" disabled={member} loading={busyIds.has(user.id)}
             accessibilityLabel={`Add @${user.username}`}
             onPress={() => run(user.id, () => add({ user_id: user.id }), 'Could not add friend')} />} />;
@@ -107,7 +110,7 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
       {pending.map(({ user }) => {
         const member = memberIds.has(user.id);
         const invited = invitedIds.has(user.id);
-        return <FriendRow key={user.id} username={user.username}
+        return <FriendRow key={user.id} username={user.username} avatarColor={user.avatar_color}
           subtitle={member ? 'Already a member' : invited ? 'Invitation sent' : 'Acceptance required'}
           actions={<Button label={member ? 'Added' : invited ? 'Invited' : 'Invite'} size="sm"
             disabled={member || invited} loading={busyIds.has(user.id)} accessibilityLabel={`Invite @${user.username}`}

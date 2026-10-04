@@ -38,7 +38,7 @@ def add_person(
         resource is not None and resource["created_by"] == target_id
     ):
         raise HTTPException(409, "This person is already a member.")
-    person = EventUser(id=target_id, username=target.get("username"))
+    person = EventUser.from_profile(target)
     if accepted_friend(friends, user_id, target_id):
         repo.add_member(resource_id, target_id)
         # A previous invitation must not remain after a friend is added directly.
@@ -57,7 +57,11 @@ def add_person(
         invite=EventInvite(
             id=row["id"],
             user=person,
-            invited_by=EventUser(id=user_id, username=inviter.get("username") if inviter else None),
+            invited_by=(
+                EventUser.from_profile(inviter)
+                if inviter
+                else EventUser.lookup({}, user_id)
+            ),
             created_at=row["created_at"],
         ),
     )

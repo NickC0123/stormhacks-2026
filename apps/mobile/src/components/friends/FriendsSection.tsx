@@ -45,6 +45,7 @@ export function FriendsSection({ friends }: Props) {
               <FriendRow
                 key={request.id}
                 username={request.user.username}
+                avatarColor={request.user.avatar_color}
                 subtitle="Wants to be friends"
                 actions={
                   <>
@@ -76,6 +77,7 @@ export function FriendsSection({ friends }: Props) {
               <FriendRow
                 key={request.id}
                 username={request.user.username}
+                avatarColor={request.user.avatar_color}
                 subtitle="Pending"
                 actions={
                   <Button
@@ -101,6 +103,7 @@ export function FriendsSection({ friends }: Props) {
             <FriendRow
               key={friend.id}
               username={friend.user.username}
+              avatarColor={friend.user.avatar_color}
               onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: friend.user.id } })}
               actions={
                 <Button

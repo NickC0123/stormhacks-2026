@@ -65,17 +65,20 @@ def list_expenses(
     offset: int = Query(default=0, ge=0),
 ) -> list[Expense]:
     db = get_supabase()
-    memberships = (
-        db.table("expense_members").select("expense_id").eq("user_id", user.id).execute().data
-    )
     query = db.table("expenses").select("*")
-    if memberships:
-        ids = ",".join(row["expense_id"] for row in memberships)
-        query = query.or_(f"created_by.eq.{user.id},id.in.({ids})")
-    else:
-        query = query.eq("created_by", user.id)
     if event_id is not None:
+        # Event members see every expense tied to the event.
+        check_event(event_id, user.id)
         query = query.eq("event_id", str(event_id))
+    else:
+        memberships = (
+            db.table("expense_members").select("expense_id").eq("user_id", user.id).execute().data
+        )
+        if memberships:
+            ids = ",".join(row["expense_id"] for row in memberships)
+            query = query.or_(f"created_by.eq.{user.id},id.in.({ids})")
+        else:
+            query = query.eq("created_by", user.id)
     rows = (
         query.order("date", desc=True)
         .order("created_at", desc=True)

@@ -126,7 +126,12 @@ def sign_in(user_id):
 def test_friends_added_and_removed_without_accepting(flow):
     res = flow.add(BOB)
     assert res.status_code == 201
-    assert res.json() == {"status": "added", "user": {"id": BOB, "username": "bob"}, "invite": None}
+    body = res.json()
+    assert body["status"] == "added"
+    assert body["invite"] is None
+    assert body["user"]["id"] == BOB
+    assert body["user"]["username"] == "bob"
+    assert body["user"]["avatar_color"]
     assert flow.repo.is_member(flow.id, BOB)
     assert flow.repo.invites == {}
     sign_in(BOB)

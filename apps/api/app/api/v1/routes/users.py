@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.auth import CurrentUserDep
+from app.core.avatar_color import coerce_avatar_color
 from app.schemas.profile import PublicProfile
 from app.services.contacts import shown_contacts
 from app.services.friends import FriendsRepoDep
@@ -26,5 +27,8 @@ def get_user(user_id: UUID, user: CurrentUserDep, repo: FriendsRepoDep) -> Publi
         if not is_friend and not repo.shares_event(user.id, other_id):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
     return PublicProfile(
-        id=profile["id"], username=profile.get("username"), contacts=shown_contacts(profile)
+        id=profile["id"],
+        username=profile.get("username"),
+        avatar_color=coerce_avatar_color(profile.get("avatar_color"), user_id=other_id),
+        contacts=shown_contacts(profile),
     )

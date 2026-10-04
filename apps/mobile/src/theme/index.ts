@@ -11,4 +11,4 @@ export {
   motion,
   opacity,
 } from '@/theme/tokens';
-export type { ColorScheme, Theme, ThemeColors } from '@/theme/tokens';
+export type { AvatarAccent, ColorScheme, Theme, ThemeColors } from '@/theme/tokens';
