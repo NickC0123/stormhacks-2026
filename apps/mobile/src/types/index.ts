@@ -169,6 +169,15 @@ export type Memory = {
   createdAt: string;
 };
 
+/** A photo someone in the event added. `url` is a short-lived signed link. */
+export type EventPhoto = {
+  id: UUID;
+  event_id: UUID;
+  author_id: UUID;
+  url: string;
+  created_at: string;
+};
+
 export type ExpenseItem = {
   id?: UUID;
   name: string;
