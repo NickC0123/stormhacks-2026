@@ -9,14 +9,16 @@ from app.schemas.profile import (
     ContactSettings,
 )
 
-HANDLE_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,30}$")
+HANDLE_PATTERN = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+FACEBOOK_PATTERN = re.compile(r"^[A-Za-z0-9.]{5,50}$")
+FACEBOOK_URL_PREFIX = re.compile(r"^(https?://)?(www\.|m\.)?facebook\.com/", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9 ()-]{5,22}[0-9]$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MAX_LENGTH = 100
 
 LABELS: dict[ContactKind, str] = {
     "instagram": "Instagram",
-    "snapchat": "Snapchat",
+    "facebook": "Facebook",
     "whatsapp": "WhatsApp",
     "etransfer_email": "E-transfer email",
     "etransfer_phone": "E-transfer phone",
@@ -34,12 +36,16 @@ def normalize_contact(kind: ContactKind, raw: str | None) -> str | None:
     if not value:
         return None
     label = LABELS[kind]
-    if kind in ("instagram", "snapchat"):
+    if kind == "instagram":
         value = value.removeprefix("@")
         if not HANDLE_PATTERN.fullmatch(value):
             raise ValueError(
-                f"{label} usernames are up to 30 letters, numbers, periods, dashes, or underscores."
+                f"{label} usernames are up to 30 letters, numbers, periods, or underscores."
             )
+    elif kind == "facebook":
+        value = FACEBOOK_URL_PREFIX.sub("", value).removeprefix("@").rstrip("/")
+        if not FACEBOOK_PATTERN.fullmatch(value):
+            raise ValueError(f"{label} usernames are 5-50 letters, numbers, or periods.")
     elif kind in ("whatsapp", "etransfer_phone"):
         if not PHONE_PATTERN.fullmatch(value):
             raise ValueError(f"{label} must be a phone number, like +1 604 555 0123.")

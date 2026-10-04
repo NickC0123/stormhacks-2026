@@ -4,8 +4,8 @@ import type { ContactKind, ContactSetting, PublicProfile } from '@/types';
 type ContactMeta = {
   label: string;
   placeholder: string;
-  /** Handles are shown and entered with a leading "@". */
-  handle: boolean;
+  /** Shown before the value, both in the input and on profiles, e.g. "@". */
+  prefix?: string;
   keyboardType: 'default' | 'email-address' | 'phone-pad';
   /** Link that opens the contact in its app, if there is one. */
   url?: (value: string) => string;
@@ -16,40 +16,37 @@ export const CONTACTS: Record<ContactKind, ContactMeta> = {
   instagram: {
     label: 'Instagram',
     placeholder: 'username',
-    handle: true,
+    prefix: '@',
     keyboardType: 'default',
     url: (value) => `https://instagram.com/${encodeURIComponent(value)}`,
   },
-  snapchat: {
-    label: 'Snapchat',
+  facebook: {
+    label: 'Facebook',
     placeholder: 'username',
-    handle: true,
+    prefix: 'facebook.com/',
     keyboardType: 'default',
-    url: (value) => `https://www.snapchat.com/add/${encodeURIComponent(value)}`,
+    url: (value) => `https://www.facebook.com/${encodeURIComponent(value)}`,
   },
   whatsapp: {
     label: 'WhatsApp',
     placeholder: '+1 604 555 0123',
-    handle: false,
     keyboardType: 'phone-pad',
     url: (value) => `https://wa.me/${value.replace(/\D/g, '')}`,
   },
   etransfer_email: {
     label: 'E-transfer email',
     placeholder: 'you@example.com',
-    handle: false,
     keyboardType: 'email-address',
   },
   etransfer_phone: {
     label: 'E-transfer phone',
     placeholder: '+1 604 555 0123',
-    handle: false,
     keyboardType: 'phone-pad',
   },
 };
 
 export function formatContact(kind: ContactKind, value: string): string {
-  return CONTACTS[kind].handle ? `@${value}` : value;
+  return `${CONTACTS[kind].prefix ?? ''}${value}`;
 }
 
 export function getMyContacts(): Promise<{ contacts: ContactSetting[] }> {

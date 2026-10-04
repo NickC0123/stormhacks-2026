@@ -3,10 +3,10 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-ContactKind = Literal["instagram", "snapchat", "whatsapp", "etransfer_email", "etransfer_phone"]
+ContactKind = Literal["instagram", "facebook", "whatsapp", "etransfer_email", "etransfer_phone"]
 CONTACT_KINDS: tuple[ContactKind, ...] = (
     "instagram",
-    "snapchat",
+    "facebook",
     "whatsapp",
     "etransfer_email",
     "etransfer_phone",

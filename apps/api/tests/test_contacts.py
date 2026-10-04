@@ -45,7 +45,7 @@ def test_contacts_default_to_empty_and_hidden(repo: ContactsRepo) -> None:
     contacts = client.get("/api/v1/me/contacts").json()["contacts"]
     assert [c["kind"] for c in contacts] == [
         "instagram",
-        "snapchat",
+        "facebook",
         "whatsapp",
         "etransfer_email",
         "etransfer_phone",
@@ -56,14 +56,14 @@ def test_contacts_default_to_empty_and_hidden(repo: ContactsRepo) -> None:
 def test_save_normalizes_and_only_shows_chosen_fields(repo: ContactsRepo) -> None:
     res = save(
         {"kind": "instagram", "value": " @alice.ig ", "visible": True},
-        {"kind": "snapchat", "value": "alicesnap", "visible": False},
+        {"kind": "facebook", "value": "https://www.facebook.com/alice.fb/", "visible": False},
         {"kind": "etransfer_email", "value": "alice@example.com", "visible": True},
         {"kind": "whatsapp", "value": "", "visible": True},
     )
     assert res.status_code == 200
     by_kind = {c["kind"]: c for c in res.json()["contacts"]}
     assert by_kind["instagram"] == {"kind": "instagram", "value": "alice.ig", "visible": True}
-    assert by_kind["snapchat"]["visible"] is False
+    assert by_kind["facebook"] == {"kind": "facebook", "value": "alice.fb", "visible": False}
     # An empty field can't be visible.
     assert by_kind["whatsapp"] == {"kind": "whatsapp", "value": None, "visible": False}
 
@@ -79,13 +79,14 @@ def test_save_normalizes_and_only_shows_chosen_fields(repo: ContactsRepo) -> Non
 
 def test_invalid_values_are_rejected(repo: ContactsRepo) -> None:
     assert save({"kind": "instagram", "value": "has space"}).status_code == 422
+    assert save({"kind": "facebook", "value": "abc"}).status_code == 422
     assert save({"kind": "etransfer_email", "value": "nope"}).status_code == 422
     assert save({"kind": "etransfer_phone", "value": "call me"}).status_code == 422
     assert save({"kind": "etransfer_phone", "value": "+1 (604) 555-0123"}).status_code == 200
 
 
 def test_only_friends_and_event_mates_can_view(repo: ContactsRepo) -> None:
-    save({"kind": "snapchat", "value": "alicesnap", "visible": True})
+    save({"kind": "facebook", "value": "alice.fb", "visible": True})
 
     sign_in(BOB)
     assert client.get(f"/api/v1/users/{ALICE}").status_code == 404
@@ -97,7 +98,7 @@ def test_only_friends_and_event_mates_can_view(repo: ContactsRepo) -> None:
     repo.shared_events.add(frozenset((ALICE, CAROL)))
     sign_in(CAROL)
     assert client.get(f"/api/v1/users/{ALICE}").json()["contacts"] == [
-        {"kind": "snapchat", "value": "alicesnap"}
+        {"kind": "facebook", "value": "alice.fb"}
     ]
 
     sign_in(ALICE)

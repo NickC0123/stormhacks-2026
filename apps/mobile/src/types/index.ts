@@ -74,7 +74,7 @@ export type Profile = {
   display_name: string;
 };
 
-export type ContactKind = 'instagram' | 'snapchat' | 'whatsapp' | 'etransfer_email' | 'etransfer_phone';
+export type ContactKind = 'instagram' | 'facebook' | 'whatsapp' | 'etransfer_email' | 'etransfer_phone';
 
 /** One of the signed-in user's contact fields. Others only see it when `visible`. */
 export type ContactSetting = {

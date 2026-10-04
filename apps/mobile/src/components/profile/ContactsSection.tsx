@@ -85,7 +85,7 @@ export function ContactsSection() {
             <View key={contact.kind} style={styles.field}>
               <TextField
                 label={meta.label}
-                prefix={meta.handle ? '@' : undefined}
+                prefix={meta.prefix}
                 value={contact.value ?? ''}
                 onChangeText={(text) =>
                   update(contact.kind, { value: text, visible: text.trim() ? contact.visible : false })
