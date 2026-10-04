@@ -74,6 +74,26 @@ class FriendsRepo:
                 raise UsernameTakenError from exc
             raise
 
+    def save_contacts(self, user_id: str, columns: Row) -> Row | None:
+        updated = self.db.table("profiles").update(columns).eq("id", user_id).execute().data
+        return updated[0] if updated else None
+
+    def shares_event(self, user_a: str, user_b: str) -> bool:
+        events = self.db.table("event_members").select("event_id").eq("user_id", user_a).execute()
+        event_ids = [row["event_id"] for row in events.data]
+        if not event_ids:
+            return False
+        rows = (
+            self.db.table("event_members")
+            .select("event_id")
+            .eq("user_id", user_b)
+            .in_("event_id", event_ids)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return bool(rows)
+
     def get_friendship(self, friendship_id: str) -> Row | None:
         rows = (
             self.db.table("friendships").select("*").eq("id", friendship_id).limit(1).execute()

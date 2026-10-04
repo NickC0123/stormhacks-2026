@@ -62,6 +62,11 @@ export default function EventScreen() {
                 key={member.id}
                 username={member.username ?? 'unknown'}
                 subtitle={roles.length ? roles.join(' · ') : undefined}
+                onPress={
+                  member.id === profile?.id
+                    ? undefined
+                    : () => router.push({ pathname: '/users/[userId]', params: { userId: member.id } })
+                }
               />
             );
           })}
