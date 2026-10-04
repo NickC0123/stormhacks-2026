@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
 
 import { useTheme, type Theme } from '@/theme';
 
@@ -10,49 +10,98 @@ type Props = {
   segments: DonutSegment[];
   /** Read by screen readers instead of the drawing. Describe every segment in text. */
   accessibilityLabel: string;
-  /** Centered inside the ring, e.g. the total. */
+  /** Controlled selection (press / legend). `null` = none. */
+  selectedIndex?: number | null;
+  onSelectChange?: (index: number | null) => void;
+  /** Centered inside the ring, e.g. the total or selected slice. */
   children?: ReactNode;
 };
 
-/** Ring chart of positive values. Colors must also be explained by a text legend. */
-export function DonutChart({ segments, accessibilityLabel, children }: Props) {
+/**
+ * Donut chart via react-native-gifted-charts, themed to our tokens.
+ * Press a slice (or drive selection from a legend) to focus it.
+ * Fades/scales in on load (gifted PieChart’s built-in `isAnimated` only works on PieChartPro).
+ */
+export function DonutChart({
+  segments,
+  accessibilityLabel,
+  selectedIndex = null,
+  onSelectChange,
+  children,
+}: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { donut: size, donutStroke: stroke, donutGap } = theme.sizes;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((sum, segment) => sum + Math.max(segment.value, 0), 0);
-  const gap = segments.length > 1 ? donutGap : 0;
+  const hoverOffset = theme.sizes.donutHoverOffset;
+  const radius = theme.sizes.donut / 2 - hoverOffset;
+  const innerRadius = Math.max(radius - theme.sizes.donutStroke, 0);
+  const focusedIndex = selectedIndex ?? -1;
+  const appear = useRef(new Animated.Value(0)).current;
+  const dataKey = segments.map((segment) => `${segment.key}:${segment.value}`).join('|');
 
-  let offset = 0;
-  const arcs = total > 0 ? segments.filter((segment) => segment.value > 0).map((segment) => {
-    const length = (segment.value / total) * circumference;
-    const arc = { ...segment, offset, visible: Math.max(length - gap, 0) };
-    offset += length;
-    return arc;
-  }) : [];
+  useEffect(() => {
+    appear.setValue(0);
+    Animated.timing(appear, {
+      toValue: 1,
+      duration: theme.motion.duration.slow,
+      easing: Easing.bezier(...theme.motion.easeTab),
+      useNativeDriver: true,
+    }).start();
+  }, [appear, dataKey, theme.motion.duration.slow, theme.motion.easeTab]);
+
+  const data = segments.map((segment, index) => ({
+    value: Math.max(segment.value, 0),
+    color: segment.color,
+    focused: focusedIndex === index,
+    onPress: () => {
+      if (!onSelectChange) return;
+      onSelectChange(focusedIndex === index ? null : index);
+    },
+  }));
 
   return (
-    <View style={styles.chart} accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
-      <Svg width={size} height={size} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-          <Circle cx={size / 2} cy={size / 2} r={radius} stroke={theme.colors.borderSubtle} strokeWidth={stroke} fill="none" />
-          {arcs.map((arc) => (
-            <Circle
-              key={arc.key}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke={arc.color}
-              strokeWidth={stroke}
-              fill="none"
-              strokeDasharray={`${arc.visible} ${circumference - arc.visible}`}
-              strokeDashoffset={-arc.offset}
-            />
-          ))}
-        </G>
-      </Svg>
-      {children ? <View style={styles.center} pointerEvents="none">{children}</View> : null}
+    <View
+      style={styles.chart}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View
+        style={{
+          opacity: appear,
+          transform: [
+            {
+              scale: appear.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.88, 1],
+              }),
+            },
+          ],
+        }}
+      >
+        <PieChart
+          data={data}
+          donut
+          radius={radius}
+          innerRadius={innerRadius}
+          extraRadius={hoverOffset}
+          focusOnPress
+          toggleFocusOnPress
+          selectedIndex={focusedIndex}
+          setSelectedIndex={(index: number) => {
+            onSelectChange?.(index < 0 ? null : index);
+          }}
+          innerCircleColor={theme.colors.bgSurface}
+          backgroundColor="transparent"
+          strokeWidth={theme.sizes.donutGap}
+          strokeColor={theme.colors.bgSurface}
+          edgesRadius={theme.radius.sm}
+          centerLabelComponent={() => (
+            <View style={styles.center} pointerEvents="none">
+              {children}
+            </View>
+          )}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -60,15 +109,15 @@ export function DonutChart({ segments, accessibilityLabel, children }: Props) {
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     chart: {
-      width: theme.sizes.donut,
-      height: theme.sizes.donut,
       alignSelf: 'center',
-    },
-    center: {
-      ...StyleSheet.absoluteFill,
       alignItems: 'center',
       justifyContent: 'center',
-      padding: theme.sizes.donutStroke + theme.spacing[1],
+    },
+    center: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing[2],
+      maxWidth: theme.sizes.donut - theme.sizes.donutStroke * 2,
     },
   });
 }

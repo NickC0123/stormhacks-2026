@@ -1,8 +1,15 @@
 import { apiFetch } from '@/lib/api';
-import type { EventDetail, PersonAdded, EventListItem, EventSummary, EventUser, IncomingInvite } from '@/types';
+import type {
+  EventDetail,
+  EventHomeItem,
+  EventSummary,
+  EventUser,
+  IncomingInvite,
+  PersonAdded,
+} from '@/types';
 
-export function listEvents(): Promise<EventListItem[]> {
-  return apiFetch<EventListItem[]>('/events');
+export function listEvents(): Promise<EventHomeItem[]> {
+  return apiFetch<EventHomeItem[]>('/events');
 }
 
 export function getEvent(eventId: string): Promise<EventDetail> {

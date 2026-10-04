@@ -158,3 +158,4 @@ def test_photo_delete_hidden_from_non_members_and_other_events(setup):
     sign_in(ALICE)
     assert client.delete(f"/api/v1/events/{event_id}/photos/{uuid.uuid4()}").status_code == 404
     assert len(photos.rows) == 1
+

@@ -5,6 +5,8 @@ import {
   StyleSheet,
   Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -35,6 +37,8 @@ type Props = {
   contentStyle?: StyleProp<ViewStyle>;
   /** Soft scrim over the bottom of scrolling content (Events). */
   bottomFade?: boolean;
+  /** Fired while the page scrolls (e.g. reveal-on-scroll animations). */
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 /** Placeholder screen shell used while features are being built. */
@@ -53,6 +57,7 @@ export function Screen({
   children,
   contentStyle,
   bottomFade = false,
+  onScroll,
 }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -79,6 +84,8 @@ export function Screen({
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={onScroll ? 16 : undefined}
           refreshControl={
             onRefresh ? (
               <RefreshControl

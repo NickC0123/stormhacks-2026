@@ -15,6 +15,10 @@ type Props = {
   onPress: () => void;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  /** `sm` is used on the event detail header. Defaults to `md`. */
+  size?: 'sm' | 'md';
+  /** Horizontal alignment of the facepile. Defaults to `start`. */
+  align?: 'start' | 'center';
 };
 
 function resolveColor(color: AvatarColor | null | undefined): AvatarColor {
@@ -30,9 +34,13 @@ export function AvatarStack({
   onPress,
   accessibilityLabel,
   accessibilityHint = 'Opens manage people',
+  size = 'md',
+  align = 'start',
 }: Props) {
   const theme = useTheme();
-  const styles = createStyles(theme);
+  const avatarSize = size === 'sm' ? theme.sizes.avatarStackSm : theme.sizes.avatarStack;
+  const overlap = size === 'sm' ? theme.sizes.avatarStackSmOverlap : theme.sizes.avatarStackOverlap;
+  const styles = createStyles(theme, avatarSize, overlap, align);
   const max = theme.sizes.avatarStackMax;
   const visible = people.slice(0, max);
   const overflow = Math.max(0, people.length - max);
@@ -84,13 +92,17 @@ export function AvatarStack({
   );
 }
 
-function createStyles(theme: Theme) {
-  const size = theme.sizes.avatarStack;
+function createStyles(
+  theme: Theme,
+  size: number,
+  overlap: number,
+  align: 'start' | 'center',
+) {
   return StyleSheet.create({
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-start',
+      alignSelf: align === 'center' ? 'center' : 'flex-start',
     },
     pressed: {
       opacity: 0.85,
@@ -106,18 +118,18 @@ function createStyles(theme: Theme) {
       borderColor: theme.colors.bgPage,
     },
     overlap: {
-      marginLeft: -theme.sizes.avatarStackOverlap,
+      marginLeft: -overlap,
     },
     overflow: {
       backgroundColor: theme.colors.borderDefault,
     },
     initial: {
-      ...theme.typography.bodySm,
+      ...(size <= theme.sizes.avatarStackSm ? theme.typography.caption : theme.typography.bodySm),
       fontFamily: theme.fonts.sans.medium,
       color: theme.colors.textPrimary,
     },
     overflowLabel: {
-      ...theme.typography.bodySm,
+      ...(size <= theme.sizes.avatarStackSm ? theme.typography.caption : theme.typography.bodySm),
       fontFamily: theme.fonts.sans.medium,
       color: theme.colors.textPrimary,
     },

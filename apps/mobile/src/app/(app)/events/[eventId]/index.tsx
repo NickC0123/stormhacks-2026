@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EventActionModal } from '@/components/events/EventActionModal';
 import { EventExpenses } from '@/components/events/EventExpenses';
@@ -40,6 +41,7 @@ export default function EventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const { profile } = useProfile();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
   const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState<EventTab>('photos');
@@ -80,7 +82,7 @@ export default function EventScreen() {
 
   if (!event) {
     return (
-      <Screen title="Event" headerLeft={<EventBackButton />}>
+      <Screen title="Event" headerLeft={<EventBackButton />} headerRight={<View />}>
         <View style={styles.content}>
           <LoadState loading={loading} error={error} fallbackError="Could not load this event." onRetry={retry} />
         </View>
@@ -91,23 +93,6 @@ export default function EventScreen() {
   const date = formatEventDate(event.starts_at ?? event.created_at);
   const isHost = event.created_by === profile?.id;
 
-  const headerRight = (
-    <View style={styles.headerActions}>
-      {isHost ? (
-        <CircleIconButton
-          accessibilityLabel="Delete event"
-          onPress={confirmDelete}
-          disabled={deleting}
-        >
-          <SFSymbolIcon name="trash" color={theme.colors.danger} />
-        </CircleIconButton>
-      ) : null}
-      <CircleIconButton accessibilityLabel="Add to event" onPress={() => setCreateOpen(true)}>
-        <SFSymbolIcon name="plus" />
-      </CircleIconButton>
-    </View>
-  );
-
   return (
     <>
       <Screen
@@ -117,7 +102,19 @@ export default function EventScreen() {
         onRefresh={refresh}
         refreshing={refreshing}
         headerLeft={<EventBackButton />}
-        headerRight={headerRight}
+        headerRight={
+          isHost ? (
+            <CircleIconButton
+              accessibilityLabel="Delete event"
+              onPress={confirmDelete}
+              disabled={deleting}
+            >
+              <SFSymbolIcon name="trash" color={theme.colors.danger} />
+            </CircleIconButton>
+          ) : (
+            <View />
+          )
+        }
       >
         <View style={styles.content}>
           {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
@@ -153,6 +150,25 @@ export default function EventScreen() {
         </View>
       </Screen>
 
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.fabWrap,
+          {
+            bottom: Math.max(insets.bottom, theme.spacing[4]) + theme.spacing[2],
+            right: theme.sizes.pagePaddingX,
+          },
+        ]}
+      >
+        <CircleIconButton
+          variant="accent"
+          accessibilityLabel="Add to event"
+          onPress={() => setCreateOpen(true)}
+        >
+          <SFSymbolIcon name="plus" color={theme.colors.onAccent} />
+        </CircleIconButton>
+      </View>
+
       <EventActionModal
         visible={createOpen}
         onClose={() => setCreateOpen(false)}
@@ -174,11 +190,6 @@ function createStyles(theme: Theme) {
       marginTop: theme.spacing[3],
       gap: theme.spacing[8],
     },
-    headerActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing[2],
-    },
     tabSection: {
       gap: theme.spacing[4],
     },
@@ -191,6 +202,10 @@ function createStyles(theme: Theme) {
     error: {
       ...theme.typography.bodySm,
       color: theme.colors.danger,
+    },
+    fabWrap: {
+      position: 'absolute',
+      zIndex: 1,
     },
   });
 }

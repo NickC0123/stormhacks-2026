@@ -35,7 +35,9 @@ def list_photos(
     rows = photos.list_photos(event["id"])
     urls = photos.signed_urls([row["photo_path"] for row in rows])
     # A file missing from storage gets no URL; skip it rather than fail the whole list.
-    return [to_photo(row, urls[row["photo_path"]]) for row in rows if row["photo_path"] in urls]
+    return [
+        to_photo(row, urls[row["photo_path"]]) for row in rows if row["photo_path"] in urls
+    ]
 
 
 @router.post("", response_model=EventPhoto, status_code=status.HTTP_201_CREATED)

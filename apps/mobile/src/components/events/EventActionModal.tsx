@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  InteractionManager,
   Modal,
   Pressable,
   StyleSheet,
@@ -20,7 +21,7 @@ type Props = {
 };
 
 /**
- * Event create chooser — Add Photo / Add Expense.
+ * Event create chooser — Add Photos / Add Expense.
  * Same panel reveal motion as CreateActionModal.
  */
 export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }: Props) {
@@ -32,6 +33,8 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
   const progress = useRef(new Animated.Value(0)).current;
   const wasOpen = useRef(false);
   const closingRef = useRef(false);
+  /** Run after the RN Modal fully unmounts — launching the photo picker while it is still up cancels the picker on iOS. */
+  const afterClose = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -45,6 +48,20 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
     };
   }, []);
 
+  function finishClose() {
+    wasOpen.current = false;
+    closingRef.current = false;
+    setMounted(false);
+    const next = afterClose.current;
+    afterClose.current = null;
+    if (next) {
+      // Wait until the native Modal is gone — opening PHPicker on top of it cancels selection on iOS.
+      InteractionManager.runAfterInteractions(() => {
+        next();
+      });
+    }
+  }
+
   useEffect(() => {
     const [x1, y1, x2, y2] = theme.motion.easeTab;
     const easing = Easing.bezier(x1, y1, x2, y2);
@@ -52,6 +69,7 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
     if (visible) {
       wasOpen.current = true;
       closingRef.current = false;
+      afterClose.current = null;
       setMounted(true);
 
       if (reduceMotion) {
@@ -74,9 +92,7 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
 
     if (reduceMotion) {
       progress.setValue(0);
-      wasOpen.current = false;
-      closingRef.current = false;
-      setMounted(false);
+      finishClose();
       return;
     }
 
@@ -89,26 +105,23 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
     });
     anim.start(({ finished }) => {
       if (!finished) return;
-      wasOpen.current = false;
-      closingRef.current = false;
-      setMounted(false);
+      finishClose();
     });
     return () => anim.stop();
   }, [visible, reduceMotion, theme, progress]);
 
-  function requestClose() {
+  function requestClose(then?: () => void) {
     if (closingRef.current || !wasOpen.current) return;
+    afterClose.current = then ?? null;
     onClose();
   }
 
   function choosePhoto() {
-    requestClose();
-    onAddPhoto();
+    requestClose(onAddPhoto);
   }
 
   function chooseExpense() {
-    requestClose();
-    onAddExpense();
+    requestClose(onAddExpense);
   }
 
   const translateY = progress.interpolate({
@@ -124,14 +137,14 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
       visible={mounted}
       transparent
       animationType="none"
-      onRequestClose={requestClose}
+      onRequestClose={() => requestClose()}
       statusBarTranslucent
     >
       <View style={styles.overlayRoot}>
         <Animated.View style={[styles.overlayFill, { opacity: progress }]} pointerEvents="none" />
         <Pressable
           style={StyleSheet.absoluteFill}
-          onPress={requestClose}
+          onPress={() => requestClose()}
           accessibilityRole="button"
           accessibilityLabel="Dismiss"
         />
@@ -154,9 +167,9 @@ export function EventActionModal({ visible, onClose, onAddPhoto, onAddExpense }:
               style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
               onPress={choosePhoto}
               accessibilityRole="button"
-              accessibilityLabel="Add Photo"
+              accessibilityLabel="Add Photos"
             >
-              <Text style={styles.actionLabel}>Add Photo</Text>
+              <Text style={styles.actionLabel}>Add Photos</Text>
             </Pressable>
 
             <Pressable

@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LoadState } from '@/components/ui/LoadState';
@@ -15,10 +15,29 @@ const COLUMNS = 3;
 // Below 1, the picker re-encodes as JPEG, which also converts iOS HEIC photos and keeps uploads small.
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
   mediaTypes: ['images'],
-  quality: 0.6,
+  quality: 0.5,
   allowsMultipleSelection: true,
-  selectionLimit: 10,
+  selectionLimit: 20,
+  orderedSelection: true,
 };
+
+async function ensureLibraryPermission(): Promise<boolean> {
+  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (current.granted || current.accessPrivileges === 'limited') return true;
+  const asked = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (asked.granted || asked.accessPrivileges === 'limited') return true;
+  Alert.alert(
+    'Photo access needed',
+    'Allow photo access in Settings to add memories to this event.',
+    asked.canAskAgain
+      ? [{ text: 'OK' }]
+      : [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+  );
+  return false;
+}
 
 type Props = {
   eventId: string;
@@ -35,36 +54,53 @@ export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props)
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
   const loader = useCallback(() => listEventPhotos(eventId), [eventId]);
-  const { data: photos, loading, error, busyIds, run, reload, retry } = useFocusedData(
+  const { data: remotePhotos, loading, error, busyIds, run, reload, retry } = useFocusedData(
     loader,
     'Could not load photos.',
   );
+  const [photos, setPhotos] = useState<EventPhoto[] | null>(null);
   const [gridWidth, setGridWidth] = useState(0);
   const [viewing, setViewing] = useState<EventPhoto | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const lastPickRequest = useRef(0);
+
+  useEffect(() => {
+    setPhotos(remotePhotos);
+  }, [remotePhotos]);
 
   const canDelete = (photo: EventPhoto) =>
     userId !== undefined && (userId === photo.author_id || userId === hostId);
 
   const addPhotos = useCallback(async () => {
+    if (uploading) return;
+    if (!(await ensureLibraryPermission())) return;
     const result = await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
-    if (result.canceled) return;
+    if (result.canceled || result.assets.length === 0) return;
+    setUploading(true);
     let failed = 0;
     let lastError = '';
-    for (const asset of result.assets) {
-      try {
-        await uploadEventPhoto(eventId, asset);
-      } catch (err) {
-        failed += 1;
-        lastError = err instanceof Error ? err.message : 'Please try again.';
+    const total = result.assets.length;
+    try {
+      for (let index = 0; index < total; index += 1) {
+        setUploadProgress(`Uploading ${index + 1} of ${total}…`);
+        try {
+          await uploadEventPhoto(eventId, result.assets[index]);
+        } catch (err) {
+          failed += 1;
+          lastError = err instanceof Error ? err.message : 'Please try again.';
+        }
       }
+      await reload();
+      if (failed) {
+        const what = failed === total ? 'Your photos' : `${failed} of ${total} photos`;
+        Alert.alert(`${what} could not be added`, lastError);
+      }
+    } finally {
+      setUploading(false);
+      setUploadProgress('');
     }
-    await reload();
-    if (failed) {
-      const what = failed === result.assets.length ? 'Your photos' : `${failed} of ${result.assets.length} photos`;
-      Alert.alert(`${what} could not be added`, lastError);
-    }
-  }, [eventId, reload]);
+  }, [eventId, reload, uploading]);
 
   useEffect(() => {
     if (pickRequest > 0 && pickRequest !== lastPickRequest.current) {
@@ -96,11 +132,12 @@ export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props)
 
   return (
     <View style={styles.section}>
+      {uploading ? <Text style={styles.uploadProgress}>{uploadProgress || 'Uploading…'}</Text> : null}
       {!photos ? (
         <LoadState loading={loading} error={error} fallbackError="Could not load photos." onRetry={retry} />
-      ) : photos.length === 0 ? (
+      ) : photos.length === 0 && !uploading ? (
         <Text style={styles.empty}>No photos yet.</Text>
-      ) : (
+      ) : photos && photos.length > 0 ? (
         <View style={[styles.grid, { gap }]} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
           {tileSize > 0 &&
             photos.map((photo) => (
@@ -114,14 +151,15 @@ export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props)
                 accessibilityHint={canDelete(photo) ? 'Long press to delete' : undefined}
                 style={({ pressed }) => [
                   busyIds.has(photo.id) && styles.tileBusy,
+                  { width: tileSize, height: tileSize },
                   pressed && styles.tilePressed,
                 ]}
               >
-                <Image source={{ uri: photo.url }} style={[styles.tile, { width: tileSize, height: tileSize }]} />
+                <Image source={{ uri: photo.url }} style={styles.tile} />
               </Pressable>
             ))}
         </View>
-      )}
+      ) : null}
 
       <Modal visible={viewing !== null} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
         <View style={styles.viewer}>
@@ -146,7 +184,7 @@ export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props)
                 styles.deleteButton,
                 { top: insets.top + theme.spacing[3], right: theme.sizes.pagePaddingX },
                 pressed && !deleting && styles.deleteButtonPressed,
-                deleting && styles.deleteButtonDisabled,
+                deleting && styles.actionDisabled,
               ]}
             >
               <SFSymbolIcon name="trash" size={theme.sizes.iconMd} color={theme.colors.onDanger} />
@@ -167,11 +205,17 @@ function createStyles(theme: Theme) {
       ...theme.typography.bodySm,
       color: theme.colors.textSecondary,
     },
+    uploadProgress: {
+      ...theme.typography.bodySm,
+      color: theme.colors.textSecondary,
+    },
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
     },
     tile: {
+      width: '100%',
+      height: '100%',
       borderRadius: theme.radius.md,
       backgroundColor: theme.colors.bgSurfaceAlt,
     },
@@ -203,7 +247,7 @@ function createStyles(theme: Theme) {
     deleteButtonPressed: {
       backgroundColor: theme.colors.dangerActive,
     },
-    deleteButtonDisabled: {
+    actionDisabled: {
       opacity: theme.opacity.disabled,
     },
   });

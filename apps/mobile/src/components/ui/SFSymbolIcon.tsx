@@ -60,6 +60,14 @@ export function SFSymbolIcon({ name, size, color }: Props) {
     return <Ionicons name="trash-outline" size={iconSize} color={tint} />;
   }
 
+  if (name === 'heart') {
+    return <Ionicons name="heart-outline" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'heart.fill') {
+    return <Ionicons name="heart" size={iconSize} color={tint} />;
+  }
+
   if (name === 'square.and.arrow.up') {
     return <Ionicons name="share-outline" size={iconSize} color={tint} />;
   }

@@ -1,5 +1,6 @@
-import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { EventInvitesAndList } from '@/components/events/EventInvitesAndList';
 import { EventMemoryCard } from '@/components/events/EventMemoryCard';
@@ -7,12 +8,30 @@ import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { Screen } from '@/components/ui/Screen';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useEventsHome } from '@/hooks/useEventsHome';
+import { ScrollRevealProvider, useScrollRevealNotify } from '@/hooks/useScrollReveal';
 import { useTheme, type Theme } from '@/theme';
 
 export default function EventsScreen() {
+  return (
+    <ScrollRevealProvider>
+      <EventsScreenBody />
+    </ScrollRevealProvider>
+  );
+}
+
+function EventsScreenBody() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const home = useEventsHome();
+  const events = home.data?.events ?? [];
+  const [entranceKey, setEntranceKey] = useState(0);
+  const notifyReveal = useScrollRevealNotify();
+
+  useFocusEffect(
+    useCallback(() => {
+      setEntranceKey((key) => key + 1);
+    }, []),
+  );
 
   return (
     <Screen
@@ -23,6 +42,7 @@ export default function EventsScreen() {
       bottomFade
       onRefresh={home.refresh}
       refreshing={home.refreshing}
+      onScroll={notifyReveal ? () => notifyReveal() : undefined}
       headerLeft={
         // SF Symbol 􀣔 clock.arrow.circlepath
         <CircleIconButton accessibilityLabel="Photo archive" onPress={() => router.push('/archive')}>
@@ -43,11 +63,24 @@ export default function EventsScreen() {
         <EventInvitesAndList home={home} />
       </View>
 
-      {/* Demo cards until memories are loaded from the API. */}
+      {home.data && events.length === 0 ? (
+        <Text style={styles.empty}>
+          No events yet. Tap + to create one, or ask a friend to invite you.
+        </Text>
+      ) : null}
+
       <View style={styles.cards}>
-        <EventMemoryCard />
-        <EventMemoryCard />
-        <EventMemoryCard />
+        {events.map((event, index) => (
+          <EventMemoryCard
+            key={event.id}
+            event={event}
+            entranceKey={entranceKey}
+            revealOnScroll={index > 0}
+            onPress={() =>
+              router.push({ pathname: '/events/[eventId]', params: { eventId: event.id } })
+            }
+          />
+        ))}
       </View>
     </Screen>
   );
@@ -58,10 +91,18 @@ function createStyles(theme: Theme) {
     list: {
       marginTop: theme.spacing[8],
     },
+    empty: {
+      ...theme.typography.body,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      marginTop: theme.spacing[10],
+      paddingHorizontal: theme.spacing[6],
+    },
     cards: {
       flexDirection: 'column',
       gap: theme.spacing[12],
-      marginTop: theme.spacing[10],
+      marginTop: theme.spacing[3],
+      paddingBottom: theme.spacing[12],
     },
   });
 }
