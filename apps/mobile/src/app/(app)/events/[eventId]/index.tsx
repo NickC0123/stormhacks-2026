@@ -10,6 +10,7 @@ import { ExpenseBalanceDashboard } from '@/components/expenses/ExpenseBalanceDas
 import { Button } from '@/components/ui/Button';
 import { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { AvatarStack } from '@/components/ui/AvatarStack';
+import { BackButton } from '@/components/ui/BackButton';
 import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
@@ -28,14 +29,6 @@ const EVENT_TABS: { value: EventTab; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'expenses', label: 'Expenses' },
 ];
-
-function EventBackButton() {
-  return (
-    <CircleIconButton accessibilityLabel="Back" onPress={() => router.back()}>
-      <SFSymbolIcon name="chevron.left" />
-    </CircleIconButton>
-  );
-}
 
 function openManagePeople(eventId: string) {
   router.push({ pathname: '/events/[eventId]/invite', params: { eventId } });
@@ -92,7 +85,7 @@ export default function EventScreen() {
 
   if (!event) {
     return (
-      <Screen title="Event" headerLeft={<EventBackButton />} headerRight={<View />}>
+      <Screen title="Event" headerLeft={<BackButton />} headerRight={<View />}>
         <View style={styles.content}>
           <LoadState loading={loading} error={error} fallbackError="Could not load this event." onRetry={retry} />
         </View>
@@ -111,7 +104,7 @@ export default function EventScreen() {
         detail={[event.location?.trim(), event.description?.trim()].filter(Boolean).join('\n') || undefined}
         onRefresh={() => { setRefreshVersion((version) => version + 1); void refresh(); }}
         refreshing={refreshing}
-        headerLeft={<EventBackButton />}
+        headerLeft={<BackButton />}
         headerRight={
           isHost ? (
             <CircleIconButton

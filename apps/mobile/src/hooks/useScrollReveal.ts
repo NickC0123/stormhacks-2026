@@ -75,15 +75,13 @@ export function useScrollRevealQueue() {
 }
 
 /**
- * Calls `onEnter` once when `ref` intersects the viewport.
- * Pass a new `resetKey` to allow another entrance (e.g. tab focus).
+ * Calls `onEnter` once when `ref` intersects the viewport (per mount).
  * Set `enabled` false to skip (e.g. first card plays immediately).
  * Returns `onLayout` so callers can re-check after measuring.
  */
 export function useScrollRevealEnter(
   ref: RefObject<View | null>,
   onEnter: () => void,
-  resetKey: number,
   enabled = true,
   staggerMs = 120,
 ) {
@@ -111,10 +109,9 @@ export function useScrollRevealEnter(
 
   useEffect(() => {
     if (!enabled) return;
-    entered.current = false;
     const frame = requestAnimationFrame(check);
     return () => cancelAnimationFrame(frame);
-  }, [check, enabled, resetKey]);
+  }, [check, enabled]);
 
   useEffect(() => {
     if (!enabled || !ctx) return;

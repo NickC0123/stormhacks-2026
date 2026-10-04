@@ -10,8 +10,6 @@ import type { EventHomeItem } from '@/types';
 type Props = {
   event: EventHomeItem;
   onPress: () => void;
-  /** Bump to reset and replay entrances (e.g. on tab focus). */
-  entranceKey?: number;
   /** When true, stay hidden until scrolled into view. First card should leave this off. */
   revealOnScroll?: boolean;
 };
@@ -26,11 +24,11 @@ type PhotoSlot = {
 /**
  * Event memory preview card from Figma Group 2 (`22:3202`):
  * fanned photo stack, title, date • memories, avatar row.
+ * Entrance plays once per mount (first view / reload), not on tab re-focus.
  */
 export function EventMemoryCard({
   event,
   onPress,
-  entranceKey = 0,
   revealOnScroll = false,
 }: Props) {
   const theme = useTheme();
@@ -55,11 +53,14 @@ export function EventMemoryCard({
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+  const played = useRef(false);
   const [settled, setSettled] = useState(false);
   const [started, setStarted] = useState(!revealOnScroll);
   const { cardEntrance, easeTab } = theme.motion;
 
   const playEntrance = useCallback(() => {
+    if (played.current) return;
+    played.current = true;
     const chromeEase = Easing.bezier(...easeTab);
     const photoEase = Easing.bezier(...cardEntrance.photoEase);
     setStarted(true);
@@ -93,20 +94,10 @@ export function EventMemoryCard({
   }, [chrome, photoAnims, cardEntrance, easeTab]);
 
   useEffect(() => {
-    if (entranceKey < 1) return;
-    setSettled(false);
-    setStarted(!revealOnScroll);
-    chrome.setValue(0);
-    photoAnims.forEach((anim) => anim.setValue(0));
     if (!revealOnScroll) playEntrance();
-  }, [chrome, photoAnims, entranceKey, revealOnScroll, playEntrance]);
+  }, [revealOnScroll, playEntrance]);
 
-  const { onLayout } = useScrollRevealEnter(
-    rootRef,
-    playEntrance,
-    entranceKey,
-    revealOnScroll,
-  );
+  const { onLayout } = useScrollRevealEnter(rootRef, playEntrance, revealOnScroll);
 
   return (
     <View

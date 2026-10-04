@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useTheme, type Theme } from '@/theme';
 
 type TitleVariant = 'default' | 'page';
@@ -31,8 +32,6 @@ type Props = {
   /** Enables pull-to-refresh when set. */
   onRefresh?: () => void;
   refreshing?: boolean;
-  /** Set when a navigation header is shown above the screen; it already covers the top inset. */
-  withHeader?: boolean;
   children?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   /** Soft scrim over the bottom of scrolling content (Events). */
@@ -53,7 +52,6 @@ export function Screen({
   headerRight,
   onRefresh,
   refreshing = false,
-  withHeader = false,
   children,
   contentStyle,
   bottomFade = false,
@@ -69,10 +67,7 @@ export function Screen({
   const hasMeta = Boolean(description || detail);
 
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={withHeader ? ['left', 'right'] : ['top', 'left', 'right']}
-    >
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.body}>
         <ScrollView
           style={styles.scroll}
@@ -97,24 +92,14 @@ export function Screen({
           }
         >
           {hasChrome ? (
-            <View
-              style={[
-                styles.topBar,
-                titleVariant === 'page' && styles.topBarPage,
-              ]}
-            >
-              {/* Absolutely centered so a lone back button doesn’t shift the title. */}
-              <View style={styles.topBarTitleWrap} pointerEvents="none">
-                <Text
-                  style={[titleStyle, styles.topBarTitle, { color }]}
-                  numberOfLines={1}
-                >
-                  {title}
-                </Text>
-              </View>
-              <View style={styles.side}>{headerLeft}</View>
-              <View style={styles.sideSpacer} />
-              <View style={[styles.side, styles.sideRight]}>{headerRight}</View>
+            <View style={styles.chromeBleed}>
+              <PageHeader
+                title={title}
+                titleVariant={titleVariant}
+                titleColor={color}
+                left={headerLeft}
+                right={headerRight}
+              />
             </View>
           ) : (
             <View style={styles.header}>
@@ -188,41 +173,9 @@ function createStyles(theme: Theme) {
       bottom: 0,
       height: theme.sizes.bottomFade,
     },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      // Bleed to screen edges, then apply nav inset (content is wider-padded).
+    /** Bleed PageHeader past page padding so side buttons sit on the nav inset. */
+    chromeBleed: {
       marginHorizontal: -theme.sizes.pagePaddingX,
-      paddingHorizontal: theme.sizes.navPaddingX,
-      paddingTop: theme.spacing[2],
-      paddingBottom: theme.spacing[3],
-      minHeight: theme.sizes.fab,
-    },
-    topBarPage: {
-      // Align with Figma Events header under the status bar.
-      paddingTop: theme.spacing[3],
-    },
-    side: {
-      width: theme.sizes.fab,
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-      zIndex: 1,
-    },
-    sideRight: {
-      alignItems: 'flex-end',
-    },
-    sideSpacer: {
-      flex: 1,
-    },
-    topBarTitleWrap: {
-      ...StyleSheet.absoluteFill,
-      alignItems: 'center',
-      justifyContent: 'center',
-      // Keep clear of the circular header controls.
-      paddingHorizontal: theme.sizes.navPaddingX + theme.sizes.fab,
-    },
-    topBarTitle: {
-      textAlign: 'center',
     },
     content: {
       paddingHorizontal: theme.sizes.pagePaddingX,

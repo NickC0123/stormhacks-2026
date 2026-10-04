@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
@@ -23,7 +24,7 @@ export default function UserScreen() {
 
   if (!user) {
     return (
-      <Screen title="Profile" withHeader>
+      <Screen title="Profile" headerLeft={<BackButton />} headerRight={<View />}>
         <View style={styles.content}>
           <LoadState loading={loading} error={error} fallbackError="Could not load this profile." onRetry={retry} />
         </View>
@@ -34,7 +35,13 @@ export default function UserScreen() {
   const name = user.username ? `@${user.username}` : 'Profile';
 
   return (
-    <Screen title={name} onRefresh={refresh} refreshing={refreshing} withHeader>
+    <Screen
+      title={name}
+      onRefresh={refresh}
+      refreshing={refreshing}
+      headerLeft={<BackButton />}
+      headerRight={<View />}
+    >
       <View style={styles.content}>
         <ListGroup
           title="Contact info"

@@ -22,6 +22,13 @@ ZERO = Decimal("0.00")
 PAYMENT_CONTACTS = ("etransfer_email", "etransfer_phone")
 
 
+def _expense_date(row: dict) -> str | None:
+    value = row.get("date")
+    if value is None:
+        return None
+    return value if isinstance(value, str) else value.isoformat()
+
+
 def equal_shares(amount: Decimal, member_ids: list[str]) -> dict[str, Decimal]:
     """Stable allocation in whole cents; the shares sum exactly to the total."""
     ids = sorted(set(member_ids))
@@ -69,7 +76,21 @@ class ExpenseBalancesRepo:
             )
             rows.extend(page)
             if len(page) < 1000:
-                return rows
+                break
+        # Older RPC shapes omit `date`; fill from expenses so the drawer can show it.
+        missing = [row["id"] for row in rows if not row.get("date")]
+        if missing:
+            dates: dict[str, object] = {}
+            for start in range(0, len(missing), 100):
+                batch = missing[start : start + 100]
+                for item in (
+                    self.db.table("expenses").select("id,date").in_("id", batch).execute().data
+                ):
+                    dates[item["id"]] = item["date"]
+            for row in rows:
+                if not row.get("date") and row["id"] in dates:
+                    row["date"] = dates[row["id"]]
+        return rows
 
     def list_items(self, expense_ids: list[str]) -> dict[str, list[dict]]:
         items = {}
@@ -99,6 +120,10 @@ def balance_dashboard(
                             expense_id=row["id"],
                             title=row["title"],
                             amount=amount,
+                            event_id=row.get("event_id"),
+                            event_title=row.get("event_title"),
+                            event_starts_at=row.get("event_starts_at"),
+                            date=_expense_date(row),
                         )
                     )
         elif user_id in shares and shares[user_id]:
@@ -107,6 +132,10 @@ def balance_dashboard(
                     expense_id=row["id"],
                     title=row["title"],
                     amount=-shares[user_id],
+                    event_id=row.get("event_id"),
+                    event_title=row.get("event_title"),
+                    event_starts_at=row.get("event_starts_at"),
+                    date=_expense_date(row),
                 )
             )
     paid: dict[tuple[str, str], list[BalanceSettlement]] = defaultdict(list)

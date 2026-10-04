@@ -58,11 +58,42 @@ function AppNavigator() {
             contentStyle: { backgroundColor: theme.colors.bgSurface },
           }}
         />
-        <Stack.Screen name="archive" options={{ headerShown: true, title: 'Archive', headerBackTitle: 'Back' }} />
-        <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
-        <Stack.Screen name="users/[userId]" options={{ headerShown: true, title: 'Profile', headerBackTitle: 'Back' }} />
-        <Stack.Screen name="events/[eventId]/edit" options={{ presentation: 'modal', headerShown: false }} />
-        <Stack.Screen name="events/[eventId]/index" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="archive"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgPage },
+          }}
+        />
+        <Stack.Screen
+          name="expenses/[expenseId]"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgSurface },
+          }}
+        />
+        <Stack.Screen
+          name="users/[userId]"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgPage },
+          }}
+        />
+        <Stack.Screen
+          name="events/[eventId]/edit"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgSurface },
+          }}
+        />
+        <Stack.Screen
+          name="events/[eventId]/index"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgPage },
+          }}
+        />
         <Stack.Screen
           name="events/[eventId]/invite"
           options={{
@@ -71,8 +102,20 @@ function AppNavigator() {
             contentStyle: { backgroundColor: theme.colors.bgSurface },
           }}
         />
-        <Stack.Screen name="events/[eventId]/memories" />
-        <Stack.Screen name="events/[eventId]/receipts/[receiptId]" />
+        <Stack.Screen
+          name="events/[eventId]/memories"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgPage },
+          }}
+        />
+        <Stack.Screen
+          name="events/[eventId]/receipts/[receiptId]"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgPage },
+          }}
+        />
         <Stack.Screen
           name="events/[eventId]/receipts/scan"
           options={{

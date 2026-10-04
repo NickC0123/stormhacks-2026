@@ -37,7 +37,7 @@ function createStyles(theme: Theme) {
     },
     row: {
       padding: theme.spacing[4],
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       borderWidth: theme.sizes.borderWidth,
       borderColor: theme.colors.borderSubtle,
       backgroundColor: theme.colors.bgSurface,

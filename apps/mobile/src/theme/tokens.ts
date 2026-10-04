@@ -142,6 +142,11 @@ export type ThemeColors = {
   storyScrim: string;
   /** Spending chart segment per expense category. Always pair with a text label. */
   chartCategory: Record<ItemCategory, string>;
+  /**
+   * Ranked series after the accent (largest slice). Okabe–Ito–inspired for
+   * deuteranopia/protanopia; always pair with a text legend.
+   */
+  chartSeries: string[];
   /** Per-user initials avatar fills keyed by iOS system accent name. */
   avatarAccent: Record<AvatarColor, AvatarAccent>;
 };
@@ -163,6 +168,30 @@ function chartCategoryColors(scheme: ColorScheme): Record<ItemCategory, string> 
     work: dark ? primitives.gray400 : primitives.gray600,
     other: dark ? primitives.stone400 : primitives.stone500,
   };
+}
+
+/** Secondary donut slices (largest uses `colors.accent`). */
+function chartSeriesColors(scheme: ColorScheme): string[] {
+  const dark = scheme === 'dark';
+  return dark
+    ? [
+        '#F0A202', // orange
+        '#7CC7F0', // sky
+        '#F5E663', // yellow
+        '#4C9AD4', // blue
+        '#E07A3D', // vermillion
+        '#D48BB8', // purple
+        '#A0AEC0', // gray
+      ]
+    : [
+        '#E69F00', // orange
+        '#56B4E9', // sky
+        '#F0E442', // yellow
+        '#0072B2', // blue
+        '#D55E00', // vermillion
+        '#CC79A7', // purple
+        '#64748B', // gray
+      ];
 }
 
 /** Initials on iOS system fills — white, except yellow which needs dark label. */
@@ -226,6 +255,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       storyTrack: 'rgba(255, 255, 255, 0.35)',
       storyScrim: 'rgba(0, 0, 0, 0.35)',
       chartCategory: chartCategoryColors(scheme),
+      chartSeries: chartSeriesColors(scheme),
       avatarAccent: avatarAccentColors(scheme),
     };
   }
@@ -268,6 +298,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     storyTrack: 'rgba(255, 255, 255, 0.35)',
     storyScrim: 'rgba(0, 0, 0, 0.35)',
     chartCategory: chartCategoryColors(scheme),
+    chartSeries: chartSeriesColors(scheme),
     avatarAccent: avatarAccentColors(scheme),
   };
 }
@@ -275,6 +306,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
 /** 4pt spacing scale (matches design-spec `--space-*`). */
 export const spacing = {
   0: 0,
+  /** Half-step for tight title → subtitle stacks (e.g. spending card). */
   0.5: 2,
   1: 4,
   1.5: 6,
@@ -293,9 +325,13 @@ export const spacing = {
 export const radius = {
   none: 0,
   sm: 4,
+  /** Select / menu option rows (sm + 2). */
+  option: 6,
   md: 8,
   lg: 12,
   xl: 16,
+  /** Larger content cards (e.g. spending-by-category). */
+  '2xl': 24,
   /** iOS sheet / create-action alert corners (Figma Sheet/iPhone/Top Radius). */
   sheet: 34,
   full: 9999,
@@ -326,6 +362,12 @@ export const typography = {
     fontSize: 20,
     lineHeight: 26,
   } satisfies TextStyle,
+  /** Compact section headers (Expenses summary). Title Case in copy. */
+  sectionTitle: {
+    fontFamily: fonts.sans.semibold,
+    fontSize: 16,
+    lineHeight: 20,
+  } satisfies TextStyle,
   /** Button labels for sm/md controls. */
   button: {
     fontFamily: fonts.sans.medium,
@@ -336,6 +378,12 @@ export const typography = {
     fontFamily: fonts.sans.medium,
     fontSize: 16,
     lineHeight: 24,
+  } satisfies TextStyle,
+  /** Pill CTA labels (expense drawer / create-action). */
+  buttonCta: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 17,
+    lineHeight: 22,
   } satisfies TextStyle,
   /** Emphasized body text, e.g. list row titles. */
   bodyStrong: {
@@ -449,14 +497,25 @@ export const sizes = {
   /** Bottom content fade height (Figma Events scrim ~130). */
   bottomFade: 130,
   /** Donut chart outer diameter and ring thickness. */
-  donut: 168,
-  donutStroke: 28,
+  donut: 220,
+  donutStroke: 36,
   /** Space between donut segments (arc length at outer radius). */
   donutGap: 3,
   /** How far a selected slice shifts outward (Bklit-style hover translate). */
   donutHoverOffset: 8,
   /** Legend color swatch. */
   swatch: 12,
+  /** Horizontal balance person card on Expenses summary. */
+  balanceCard: 280,
+  /** Bottom sheet max height as a fraction of the window (half-page, grows if needed). */
+  drawerMaxHeightRatio: 0.55,
+  /** Upper clamp when drawer content needs more room. */
+  drawerMaxHeightRatioExpanded: 0.85,
+  /** Rounded settle checkbox (transitions.dev check, circular). */
+  checkbox: 22,
+  checkboxStroke: 1.75,
+  /** Path length for the check stroke-dash animation (ceil of getTotalLength). */
+  checkboxPathLen: 15,
   /** Native iOS date/time spinner wheel height. */
   dateTimePicker: 216,
   /** Thin step progress track under drawer titles. */
@@ -531,6 +590,13 @@ export const motion = {
     scale: 0.97,
     blur: 2,
     autoHideMs: 3200,
+  },
+  /** transitions.dev Checkbox check — fill then stroke-draw. */
+  check: {
+    box: 150,
+    draw: 350,
+    delay: 0,
+    uncheck: 150,
   },
   /** Home event memory cards — photos in a card scale in one-by-one. */
   cardEntrance: {

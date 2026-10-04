@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 
+import { InvitationListSkeleton } from '@/components/expenses/ExpenseCardSkeletons';
 import { FriendRow } from '@/components/friends/FriendRow';
 import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
@@ -9,7 +10,17 @@ import { acceptExpenseInvite, cancelPeopleInvite, listExpenseInvites } from '@/l
 
 export function ExpenseInvitations() {
   const { data, loading, error, retry, busyIds, run } = useFocusedData(listExpenseInvites, 'Could not load invitations.');
-  if (loading || error) return <LoadState loading={loading} error={error} fallbackError="Could not load invitations." onRetry={retry} />;
+  if (loading || error) {
+    return (
+      <LoadState
+        loading={loading}
+        error={error}
+        fallbackError="Could not load invitations."
+        onRetry={retry}
+        skeleton={<InvitationListSkeleton />}
+      />
+    );
+  }
   if (!data?.length) return null;
   return <ListGroup title="Expense invitations" count={data.length}>
     {data.map((invite) => <FriendRow key={invite.id} username={invite.invited_by.username ?? 'unknown'}

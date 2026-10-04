@@ -17,6 +17,10 @@ import { useTheme, type Theme } from '@/theme';
 export type SelectOption<T extends string = string> = {
   value: T;
   label: string;
+  /** Trailing detail beside the label (e.g. a count). */
+  meta?: string;
+  /** Non-interactive option (e.g. zero results). */
+  disabled?: boolean;
 };
 
 type Anchor = { x: number; y: number; width: number; height: number };
@@ -54,7 +58,11 @@ export function Select<T extends string>({
 
   const selected = value == null ? undefined : options.find((option) => option.value === value);
   const isPlaceholder = !selected;
-  const label = selected?.label ?? placeholder ?? '';
+  const label = selected
+    ? selected.meta
+      ? `${selected.label} · ${selected.meta}`
+      : selected.label
+    : (placeholder ?? '');
 
   useEffect(() => {
     if (!open) {
@@ -113,11 +121,10 @@ export function Select<T extends string>({
     : 0;
 
   return (
-    <>
+    <View style={style}>
       <View
         ref={triggerRef}
         collapsable={false}
-        style={style}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           triggerLayout.current = { width, height };
@@ -175,30 +182,51 @@ export function Select<T extends string>({
                 bounces={false}
                 keyboardShouldPersistTaps="handled"
                 nestedScrollEnabled
-                showsVerticalScrollIndicator
-                persistentScrollbar
-                indicatorStyle={theme.scheme === 'dark' ? 'white' : 'black'}
+                showsVerticalScrollIndicator={false}
                 style={[styles.menuScroll, { maxHeight: maxMenuHeight }]}
               >
                 {options.map((option) => {
                   const isSelected = option.value === value;
+                  const isDisabled = Boolean(option.disabled);
+                  const a11yLabel = option.meta
+                    ? `${option.label}, ${option.meta}`
+                    : option.label;
                   return (
                     <Pressable
                       key={option.value}
                       accessibilityRole="menuitem"
-                      accessibilityState={{ selected: isSelected }}
-                      accessibilityLabel={option.label}
+                      accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+                      accessibilityLabel={a11yLabel}
+                      disabled={isDisabled}
                       onPress={() => select(option.value)}
                       style={({ pressed }) => [
                         styles.option,
-                        (pressed || isSelected) && styles.optionActive,
+                        !isDisabled && isSelected && styles.optionSelected,
+                        !isDisabled && pressed && !isSelected && styles.optionActive,
+                        isDisabled && styles.optionDisabled,
                       ]}
                     >
-                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          isSelected && !isDisabled && styles.optionTextSelected,
+                          isDisabled && styles.optionTextDisabled,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {option.label}
                       </Text>
-                      {isSelected ? (
-                        <SFSymbolIcon name="checkmark" size={theme.sizes.iconSm} color={theme.colors.accentStrong} />
+                      {option.meta ? (
+                        <Text
+                          style={[
+                            styles.optionMeta,
+                            isSelected && !isDisabled && styles.optionTextSelected,
+                            isDisabled && styles.optionTextDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {option.meta}
+                        </Text>
                       ) : null}
                     </Pressable>
                   );
@@ -208,7 +236,7 @@ export function Select<T extends string>({
           ) : null}
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -264,19 +292,35 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: theme.spacing[3],
-      borderRadius: theme.radius.sm,
+      borderRadius: theme.radius.option,
       gap: theme.spacing[2],
     },
     optionActive: {
       backgroundColor: theme.colors.bgSurfaceAlt,
+    },
+    optionSelected: {
+      backgroundColor: theme.colors.accentSubtle,
+    },
+    optionDisabled: {
+      opacity: theme.opacity.disabled,
     },
     optionText: {
       ...theme.typography.bodySm,
       flex: 1,
       color: theme.colors.textPrimary,
     },
+    optionMeta: {
+      ...theme.typography.bodySm,
+      color: theme.colors.textSecondary,
+      fontVariant: ['tabular-nums'],
+      flexShrink: 0,
+    },
     optionTextSelected: {
-      fontFamily: theme.fonts.sans.medium,
+      fontFamily: theme.fonts.sans.semibold,
+      color: theme.colors.textPrimary,
+    },
+    optionTextDisabled: {
+      color: theme.colors.textTertiary,
     },
   });
 }

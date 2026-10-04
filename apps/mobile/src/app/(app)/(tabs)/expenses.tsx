@@ -1,27 +1,62 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ExpenseBalanceDashboard } from '@/components/expenses/ExpenseBalanceDashboard';
 import { ExpenseInvitations } from '@/components/expenses/ExpenseInvitations';
 import { ExpenseListSkeleton } from '@/components/expenses/ExpenseListSkeleton';
+import { ExpenseTimeline } from '@/components/expenses/ExpenseTimeline';
 import { SpendingByCategory } from '@/components/expenses/SpendingByCategory';
 import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { Screen } from '@/components/ui/Screen';
+import { Select } from '@/components/ui/Select';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { Tabs } from '@/components/ui/Tabs';
 import { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { useSpending } from '@/hooks/useSpending';
-import { listExpenses } from '@/lib/expenses';
+import { categoryLabels, listExpenses } from '@/lib/expenses';
 import { useTheme, type Theme } from '@/theme';
-import type { Expense } from '@/types';
+import type { Expense, ItemCategory } from '@/types';
 
 type ExpensesTab = 'summary' | 'all';
+type CategoryFilter = 'all' | ItemCategory;
 
 const EXPENSE_TABS: { value: ExpensesTab; label: string }[] = [
   { value: 'summary', label: 'Summary' },
   { value: 'all', label: 'All Expenses' },
 ];
+
+const CATEGORY_VALUES = Object.keys(categoryLabels) as ItemCategory[];
+
+/** Expense counts for “all” and per category (for the filter menu). */
+function categoryFilterOptions(expenses: Expense[]) {
+  const byCategory = Object.fromEntries(CATEGORY_VALUES.map((key) => [key, 0])) as Record<
+    ItemCategory,
+    number
+  >;
+  for (const expense of expenses) {
+    const seen = new Set<ItemCategory>();
+    for (const item of expense.items) {
+      if (seen.has(item.category)) continue;
+      seen.add(item.category);
+      byCategory[item.category] += 1;
+    }
+  }
+  return [
+    {
+      value: 'all' as const,
+      label: 'All Categories',
+      meta: String(expenses.length),
+      disabled: expenses.length === 0,
+    },
+    ...CATEGORY_VALUES.map((value) => ({
+      value,
+      label: categoryLabels[value],
+      meta: String(byCategory[value]),
+      disabled: byCategory[value] === 0,
+    })),
+  ];
+}
 
 export default function ExpensesScreen() {
   const theme = useTheme();
@@ -34,6 +69,22 @@ export default function ExpensesScreen() {
   const [error, setError] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const filterOptions = categoryFilterOptions(expenses);
+  const filteredExpenses =
+    categoryFilter === 'all'
+      ? expenses
+      : expenses.filter((expense) =>
+          expense.items.some((item) => item.category === categoryFilter),
+        );
+
+  useEffect(() => {
+    if (categoryFilter === 'all') return;
+    const stillHasCategory = expenses.some((expense) =>
+      expense.items.some((item) => item.category === categoryFilter),
+    );
+    if (!stillHasCategory) setCategoryFilter('all');
+  }, [categoryFilter, expenses]);
 
   const load = useCallback(() => {
     let active = true;
@@ -121,57 +172,48 @@ export default function ExpensesScreen() {
             <ExpenseInvitations />
           </View>
         ) : (
-          <View style={styles.panel}>
-            <Text style={styles.hint}>
-              Your full expense history, including paid and personal expenses.
-            </Text>
+          <View style={styles.list}>
+            <Select
+              value={categoryFilter}
+              options={filterOptions}
+              onChange={setCategoryFilter}
+              accessibilityLabel="Filter expenses by category"
+              placeholder="All Categories"
+            />
             {loading && expenses.length === 0 ? <ExpenseListSkeleton lines={3} /> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {!loading && !error && expenses.length === 0 ? (
               <Text style={styles.empty}>No expenses yet.</Text>
             ) : null}
-            {expenses.map((expense) => (
-              <Pressable
-                key={expense.id}
-                accessibilityRole="button"
-                accessibilityLabel={expense.title}
-                onPress={() =>
-                  router.push({
-                    pathname: '/expenses/[expenseId]',
-                    params: { expenseId: expense.id },
-                  })
+            {!loading && !error && expenses.length > 0 && filteredExpenses.length === 0 ? (
+              <Text style={styles.empty}>No expenses in this category.</Text>
+            ) : null}
+            {filteredExpenses.length > 0 ? (
+              <ExpenseTimeline
+                expenses={filteredExpenses}
+                footer={
+                  hasMore && categoryFilter === 'all' ? (
+                    <Pressable
+                      disabled={loadingMore}
+                      onPress={() => void more()}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        loadingMore ? 'Loading more expenses' : 'Load more expenses'
+                      }
+                      accessibilityState={{ disabled: loadingMore }}
+                      style={({ pressed }) => [
+                        styles.loadMore,
+                        pressed && !loadingMore && styles.loadMorePressed,
+                        loadingMore && styles.loadMoreDisabled,
+                      ]}
+                    >
+                      <Text style={styles.loadMoreLabel}>
+                        {loadingMore ? 'Loading…' : 'Load more'}
+                      </Text>
+                    </Pressable>
+                  ) : null
                 }
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              >
-                <Text style={styles.rowTitle}>{expense.title}</Text>
-                <Text style={styles.rowMeta}>
-                  {expense.date}
-                  {expense.time ? ` · ${expense.time.slice(0, 5)}` : ''} · Total bill:{' '}
-                  {expense.currency} {Number(expense.amount).toFixed(2)}
-                </Text>
-                <Text style={styles.rowMeta}>
-                  {expense.event_id ? 'Event expense' : 'Standalone expense'}
-                  {expense.receipt_image_path ? ' · Receipt attached' : ''}
-                </Text>
-              </Pressable>
-            ))}
-            {hasMore ? (
-              <Pressable
-                disabled={loadingMore}
-                onPress={() => void more()}
-                accessibilityRole="button"
-                accessibilityLabel={loadingMore ? 'Loading more expenses' : 'Load more expenses'}
-                accessibilityState={{ disabled: loadingMore }}
-                style={({ pressed }) => [
-                  styles.loadMore,
-                  pressed && !loadingMore && styles.loadMorePressed,
-                  loadingMore && styles.loadMoreDisabled,
-                ]}
-              >
-                <Text style={styles.loadMoreLabel}>
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </Text>
-              </Pressable>
+              />
             ) : null}
           </View>
         )}
@@ -187,11 +229,10 @@ function createStyles(theme: Theme) {
       gap: theme.spacing[4],
     },
     panel: {
-      gap: theme.spacing[3],
+      gap: theme.spacing[6],
     },
-    hint: {
-      ...theme.typography.bodySm,
-      color: theme.colors.textSecondary,
+    list: {
+      gap: theme.spacing[4],
     },
     empty: {
       ...theme.typography.body,
@@ -200,25 +241,6 @@ function createStyles(theme: Theme) {
     error: {
       ...theme.typography.body,
       color: theme.colors.textPrimary,
-    },
-    row: {
-      padding: theme.spacing[4],
-      borderRadius: theme.radius.md,
-      borderWidth: theme.sizes.borderWidth,
-      borderColor: theme.colors.borderSubtle,
-      gap: theme.spacing[2],
-      minHeight: theme.sizes.touchTarget,
-    },
-    rowPressed: {
-      backgroundColor: theme.colors.bgSurfaceAlt,
-    },
-    rowTitle: {
-      ...theme.typography.body,
-      color: theme.colors.textPrimary,
-    },
-    rowMeta: {
-      ...theme.typography.bodySm,
-      color: theme.colors.textSecondary,
     },
     loadMore: {
       minHeight: theme.sizes.touchTarget,

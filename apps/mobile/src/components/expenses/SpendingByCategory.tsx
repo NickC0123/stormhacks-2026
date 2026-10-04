@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { SpendingCardSkeleton } from '@/components/expenses/ExpenseCardSkeletons';
 import { DonutChart } from '@/components/ui/DonutChart';
 import { LoadState } from '@/components/ui/LoadState';
 import type { useSpending } from '@/hooks/useSpending';
@@ -17,20 +17,20 @@ export function SpendingByCategory({ spending }: Props) {
   const { data, loading, error, retry } = spending;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.heading} accessibilityRole="header">
-        Spending by category
-      </Text>
-      <Text style={styles.hint}>
-        Your share of each expense, so amounts others owe you are left out and amounts you owe are
-        included. Other currencies are converted to CAD at approximate rates.
-      </Text>
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.heading} accessibilityRole="header">
+          Spending By Category
+        </Text>
+        <Text style={styles.hint}>Your share only. Converted to CAD (approx.).</Text>
+      </View>
       {loading || error ? (
         <LoadState
           loading={loading}
           error={error}
           fallbackError="Could not load spending."
           onRetry={retry}
+          skeleton={<SpendingCardSkeleton />}
         />
       ) : null}
       {data && !data.by_category.length ? (
@@ -57,99 +57,86 @@ function CadSpending({
   styles: Styles;
   theme: Theme;
 }) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const total = toCents(summary.total) ?? 0;
-  const rows = summary.by_category.map(({ category, amount }) => {
-    const known = isItemCategory(category) ? category : 'other';
-    const cents = toCents(amount) ?? 0;
-    const share = total ? (cents / total) * 100 : 0;
-    return {
-      key: category,
-      label: isItemCategory(category) ? categoryLabels[category] : category,
-      color: theme.colors.chartCategory[known],
-      cents,
-      percent: share > 0 && share < 1 ? '<1%' : `${Math.round(share)}%`,
-    };
-  });
-  const selected = selectedIndex !== null ? rows[selectedIndex] : null;
+  const rows = [...summary.by_category]
+    .map(({ category, amount }) => {
+      const cents = toCents(amount) ?? 0;
+      const share = total ? (cents / total) * 100 : 0;
+      return {
+        key: category,
+        label: isItemCategory(category) ? categoryLabels[category] : category,
+        cents,
+        percent: share > 0 && share < 1 ? '<1%' : `${Math.round(share)}%`,
+      };
+    })
+    .sort((a, b) => b.cents - a.cents)
+    .map((row, index) => ({
+      ...row,
+      color:
+        index === 0
+          ? theme.colors.accent
+          : theme.colors.chartSeries[(index - 1) % theme.colors.chartSeries.length],
+    }));
   const description = rows
     .map((row) => `${row.label} ${formatCents(row.cents)}, ${row.percent}`)
     .join('; ');
 
   return (
-    <View style={styles.card}>
-      <DonutChart
-        segments={rows.map(({ key, cents, color }) => ({ key, value: cents, color }))}
-        selectedIndex={selectedIndex}
-        onSelectChange={setSelectedIndex}
-        accessibilityLabel={`Spending in ${summary.currency}: total ${formatCents(total)}. ${description}.`}
-      >
-        {selected ? (
-          <>
-            <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
-              {formatCents(selected.cents)}
-            </Text>
-            <Text style={styles.caption} numberOfLines={2}>
-              {selected.label}
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
-              {formatCents(total)}
-            </Text>
-            <Text style={styles.caption}>{summary.currency} total</Text>
-          </>
-        )}
-      </DonutChart>
-      <View style={styles.legend} accessibilityRole="list">
-        {rows.map((row, index) => {
-          const active = selectedIndex === index;
-          return (
-            <Pressable
-              key={row.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${row.label}, ${formatCents(row.cents)}, ${row.percent}`}
-              onPress={() => setSelectedIndex(active ? null : index)}
-              style={({ pressed }) => [
-                styles.legendRow,
-                active && styles.legendRowSelected,
-                pressed && styles.legendRowPressed,
-              ]}
-            >
-              <View style={[styles.swatch, { backgroundColor: row.color }]} />
-              <Text style={styles.label} numberOfLines={2}>
-                {row.label}
-              </Text>
-              <Text style={styles.amount}>{formatCents(row.cents)}</Text>
-              <Text style={styles.percent}>{row.percent}</Text>
-            </Pressable>
-          );
-        })}
+    <>
+      <View style={styles.chartBlock}>
+        <DonutChart
+          segments={rows.map(({ key, cents, color }) => ({ key, value: cents, color }))}
+          accessibilityLabel={`Spending in CAD: total $${formatCents(total)}. ${description}.`}
+        >
+          <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
+            ${formatCents(total)}
+          </Text>
+          <Text style={styles.caption}>Total (CAD)</Text>
+        </DonutChart>
       </View>
-    </View>
+      <View style={styles.legend} accessibilityRole="list">
+        {rows.map((row) => (
+          <View
+            key={row.key}
+            accessibilityRole="text"
+            accessibilityLabel={`${row.label}, ${formatCents(row.cents)}, ${row.percent}`}
+            style={styles.legendRow}
+          >
+            <View style={[styles.swatch, { backgroundColor: row.color }]} />
+            <Text style={styles.label} numberOfLines={2}>
+              {row.label}
+            </Text>
+            <Text style={styles.amount}>${formatCents(row.cents)}</Text>
+            <Text style={styles.percent}>{row.percent}</Text>
+          </View>
+        ))}
+      </View>
+    </>
   );
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    section: {
+    card: {
+      marginTop: theme.spacing[2],
       gap: theme.spacing[3],
+      padding: theme.spacing[4],
+      borderRadius: theme.radius['2xl'],
+      backgroundColor: theme.colors.bgSurface,
+    },
+    header: {
+      gap: theme.spacing[0.5],
     },
     heading: {
-      ...theme.typography.h2,
+      ...theme.typography.sectionTitle,
       color: theme.colors.textPrimary,
     },
     hint: {
       ...theme.typography.bodySm,
       color: theme.colors.textSecondary,
     },
-    card: {
-      gap: theme.spacing[4],
-      padding: theme.spacing[4],
-      borderRadius: theme.radius.lg,
-      backgroundColor: theme.colors.bgSurface,
+    chartBlock: {
+      marginTop: theme.spacing[2],
     },
     total: {
       ...theme.typography.h4,
@@ -162,21 +149,12 @@ function createStyles(theme: Theme) {
       textAlign: 'center',
     },
     legend: {
-      gap: theme.spacing[1],
+      gap: theme.spacing[2],
     },
     legendRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing[2],
-      minHeight: theme.sizes.touchTarget,
-      paddingHorizontal: theme.spacing[2],
-      borderRadius: theme.radius.md,
-    },
-    legendRowSelected: {
-      backgroundColor: theme.colors.bgSurfaceAlt,
-    },
-    legendRowPressed: {
-      opacity: 0.85,
     },
     swatch: {
       width: theme.sizes.swatch,
@@ -184,17 +162,17 @@ function createStyles(theme: Theme) {
       borderRadius: theme.radius.full,
     },
     label: {
-      ...theme.typography.body,
+      ...theme.typography.bodySm,
       color: theme.colors.textPrimary,
       flex: 1,
     },
     amount: {
-      ...theme.typography.body,
+      ...theme.typography.bodySm,
       color: theme.colors.textPrimary,
       fontVariant: ['tabular-nums'],
     },
     percent: {
-      ...theme.typography.bodySm,
+      ...theme.typography.caption,
       color: theme.colors.textSecondary,
       minWidth: theme.spacing[10],
       textAlign: 'right',
