@@ -44,7 +44,9 @@ export function useSplitDraft(eventId: string | null) {
     return () => { active = false; };
   }, [eventId]);
 
-  const me: EventUser | null = profile ? { id: profile.id, username: profile.username } : null;
+  const me: EventUser | null = profile
+    ? { id: profile.id, username: profile.username, avatar_color: profile.avatar_color }
+    : null;
   const members = eventId && eventMembers?.eventId === eventId ? eventMembers.members : [];
   const loadingEvent = Boolean(eventId) && eventMembers?.eventId !== eventId && eventError?.eventId !== eventId;
   const defaults = new Map<string, EventUser>();
@@ -142,6 +144,7 @@ export function SplitPicker({ draft, totalCents, currency, disabled }: Props) {
             <FriendRow
               key={person.id}
               username={person.username ?? 'unknown'}
+              avatarColor={person.avatar_color}
               subtitle={subtitle}
               actions={(
                 <Button
