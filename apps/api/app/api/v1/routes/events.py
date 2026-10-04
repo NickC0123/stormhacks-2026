@@ -1,15 +1,19 @@
+import logging
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.auth import CurrentUserDep
+from app.core.config import get_settings
 from app.db.supabase import get_supabase
 from app.schemas.event import Event, EventCreate
 from app.schemas.invite import EventDetail, EventInvite, EventUser
 from app.services.event_invites import EventInvitesRepo, EventInvitesRepoDep
 from app.services.friends import FriendsRepoDep
+from app.services.storage import remove_files
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/events", tags=["events"])
 
 
@@ -104,3 +108,48 @@ def get_event(
             for invite in invites
         ],
     )
+
+
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(event_id: UUID, user: CurrentUserDep, repo: EventInvitesRepoDep) -> None:
+    """Deletes the event and everything in it. Only its creator can do this."""
+    event = get_member_event(repo, event_id, user.id)
+    if event["created_by"] != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the event's host can delete it.")
+
+    db = get_supabase()
+    event_id_str = str(event_id)
+    expenses = (
+        db.table("expenses")
+        .select("id,receipt_image_path")
+        .eq("event_id", event_id_str)
+        .execute()
+        .data
+    )
+    photos = db.table("memories").select("photo_path").eq("event_id", event_id_str).execute().data
+
+    # Expenses and payments would otherwise outlive the event (their event_id is
+    # set to null), so they are removed first. Members, invites, photos and
+    # receipts cascade with the event row.
+    db.table("expenses").delete().eq("event_id", event_id_str).execute()
+    db.table("settlements").delete().eq("event_id", event_id_str).execute()
+    db.table("events").delete().eq("id", event_id_str).eq("created_by", user.id).execute()
+
+    settings = get_settings()
+    remove_stored(
+        settings.supabase_storage_bucket_receipts,
+        [row["receipt_image_path"] for row in expenses if row.get("receipt_image_path")],
+    )
+    remove_stored(
+        settings.supabase_storage_bucket_memories,
+        [row["photo_path"] for row in photos if row.get("photo_path")],
+    )
+
+
+def remove_stored(bucket: str, paths: list[str]) -> None:
+    if not paths:
+        return
+    try:
+        remove_files(bucket, paths)
+    except Exception:
+        logger.warning("Could not remove %d files from %s", len(paths), bucket, exc_info=True)

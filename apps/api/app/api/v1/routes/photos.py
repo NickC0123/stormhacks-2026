@@ -72,3 +72,31 @@ def add_photo(
             logger.warning("Could not remove orphaned event photo %s", path, exc_info=True)
         raise
     return to_photo(row, photos.signed_urls([path]).get(path, ""))
+
+
+@router.delete("/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_photo(
+    event_id: UUID,
+    photo_id: UUID,
+    user: CurrentUserDep,
+    events: EventInvitesRepoDep,
+    photos: EventPhotosRepoDep,
+) -> None:
+    """Delete one photo. Its uploader or the event's host only."""
+    event = get_member_event(events, event_id, user.id)
+    photo = photos.get_photo(event["id"], str(photo_id))
+    if photo is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Photo not found.")
+    if user.id not in (photo["author_id"], event["created_by"]):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only the person who added a photo or the host can delete it.",
+        )
+    photos.delete_photo(photo["id"])
+    if photo.get("photo_path"):
+        try:
+            photos.remove(photo["photo_path"])
+        except Exception:
+            logger.warning(
+                "Could not remove deleted event photo %s", photo["photo_path"], exc_info=True
+            )

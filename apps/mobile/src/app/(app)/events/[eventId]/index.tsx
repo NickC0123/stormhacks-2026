@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EventPhotos } from '@/components/events/EventPhotos';
 import { FriendRow } from '@/components/friends/FriendRow';
@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
+import { useSnackbar } from '@/components/ui/Snackbar';
 import { useFocusedData } from '@/hooks/useFocusedData';
-import { displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
+import { deleteEvent, displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
 import { useProfile } from '@/lib/profile';
 import { useTheme, type Theme } from '@/theme';
 
@@ -23,6 +25,34 @@ export default function EventScreen() {
     loader,
     'Could not load this event.',
   );
+  const { showSnackbar } = useSnackbar();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  function confirmDelete() {
+    if (!event) return;
+    Alert.alert(
+      'Delete event?',
+      `“${event.title}” and all its expenses, photos and recorded payments will be deleted for everyone. This can’t be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void remove() },
+      ],
+    );
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteEvent(eventId);
+      router.back();
+      showSnackbar({ message: 'Event deleted.', variant: 'success' });
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete the event.');
+      setDeleting(false);
+    }
+  }
 
   if (!event) {
     return (
@@ -39,7 +69,26 @@ export default function EventScreen() {
 
   return (
     <Screen title={event.title} description={description} onRefresh={refresh} refreshing={refreshing} withHeader>
+      {event.created_by === profile?.id ? (
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Pressable
+                onPress={confirmDelete}
+                disabled={deleting}
+                hitSlop={theme.spacing[2]}
+                accessibilityRole="button"
+                accessibilityLabel="Delete event"
+                style={({ pressed }) => (pressed || deleting) && styles.pressed}
+              >
+                <SFSymbolIcon name="trash" size={22} color={theme.colors.danger} />
+              </Pressable>
+            ),
+          }}
+        />
+      ) : null}
       <View style={styles.content}>
+        {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
         <View style={styles.actions}>
           <Button
             label="Manage people"
@@ -52,7 +101,7 @@ export default function EventScreen() {
           />
         </View>
 
-        <EventPhotos eventId={eventId} />
+        <EventPhotos eventId={eventId} hostId={event.created_by} userId={profile?.id} />
 
         <ListGroup title="Members" count={event.members.length}>
           {event.members.map((member) => {
@@ -96,6 +145,7 @@ export default function EventScreen() {
             ))}
           </ListGroup>
         ) : null}
+
       </View>
     </Screen>
   );
@@ -111,6 +161,14 @@ function createStyles(theme: Theme) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: theme.spacing[3],
+    },
+    pressed: {
+      opacity: theme.opacity.disabled,
+    },
+    error: {
+      fontFamily: theme.fonts.sans.regular,
+      fontSize: 15,
+      color: theme.colors.danger,
     },
   });
 }

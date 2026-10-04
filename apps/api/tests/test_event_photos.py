@@ -39,6 +39,14 @@ class FakePhotosRepo(EventPhotosRepo):
         self.rows.append(row)
         return row
 
+    def get_photo(self, event_id, photo_id):
+        return next(
+            (r for r in self.rows if r["id"] == photo_id and r["event_id"] == event_id), None
+        )
+
+    def delete_photo(self, photo_id):
+        self.rows = [r for r in self.rows if r["id"] != photo_id]
+
     def upload(self, path, data, content_type):
         self.files[path] = (data, content_type)
 
@@ -119,3 +127,34 @@ def test_photo_missing_from_storage_is_skipped(setup):
     upload(event_id)
     photos.files.clear()
     assert client.get(f"/api/v1/events/{event_id}/photos").json() == []
+
+
+def test_uploader_or_host_can_delete_a_photo(setup):
+    event_id, photos = setup
+    sign_in(BOB)
+    bobs = upload(event_id).json()["id"]
+    sign_in(ALICE)
+    alices = upload(event_id).json()["id"]
+
+    sign_in(BOB)
+    assert client.delete(f"/api/v1/events/{event_id}/photos/{alices}").status_code == 403
+    assert client.delete(f"/api/v1/events/{event_id}/photos/{bobs}").status_code == 204
+    sign_in(ALICE)
+    upload_again = upload(event_id).json()["id"]
+    sign_in(BOB)
+    bobs_second = upload(event_id).json()["id"]
+    sign_in(ALICE)
+    assert client.delete(f"/api/v1/events/{event_id}/photos/{bobs_second}").status_code == 204
+    assert {r["id"] for r in photos.rows} == {alices, upload_again}
+    assert len(photos.files) == 2
+
+
+def test_photo_delete_hidden_from_non_members_and_other_events(setup):
+    event_id, photos = setup
+    sign_in(ALICE)
+    photo = upload(event_id).json()["id"]
+    sign_in(MALLORY)
+    assert client.delete(f"/api/v1/events/{event_id}/photos/{photo}").status_code == 404
+    sign_in(ALICE)
+    assert client.delete(f"/api/v1/events/{event_id}/photos/{uuid.uuid4()}").status_code == 404
+    assert len(photos.rows) == 1

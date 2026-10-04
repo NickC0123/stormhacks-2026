@@ -35,6 +35,21 @@ class EventPhotosRepo:
             .data[0]
         )
 
+    def get_photo(self, event_id: str, photo_id: str) -> Row | None:
+        rows = (
+            self.db.table("memories")
+            .select("*")
+            .eq("id", photo_id)
+            .eq("event_id", event_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return rows[0] if rows else None
+
+    def delete_photo(self, photo_id: str) -> None:
+        self.db.table("memories").delete().eq("id", photo_id).execute()
+
     def upload(self, path: str, data: bytes, content_type: str) -> None:
         storage.upload_file(self.bucket, path, data, content_type)
 

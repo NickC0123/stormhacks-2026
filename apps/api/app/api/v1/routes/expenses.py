@@ -120,6 +120,17 @@ def update_expense(expense_id: UUID, body: ExpenseWrite, user: CurrentUserDep) -
     return Expense.model_validate(rows[0])
 
 
+@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(expense_id: UUID, user: CurrentUserDep) -> None:
+    """Only the creator can delete. People, invites and splits go with it."""
+    expense = require_expense(expense_id, user.id)
+    get_supabase().table("expenses").delete().eq("id", str(expense_id)).eq(
+        "created_by", user.id
+    ).execute()
+    if expense.get("receipt_image_path"):
+        remove_image(expense["receipt_image_path"])
+
+
 def remove_image(path: str) -> None:
     try:
         get_supabase().storage.from_(get_settings().supabase_storage_bucket_receipts).remove([path])

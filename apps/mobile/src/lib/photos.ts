@@ -13,3 +13,7 @@ export function uploadEventPhoto(eventId: string, asset: ImagePickerAsset): Prom
   form.append('file', new File(asset.uri) as unknown as Blob);
   return apiFetch<EventPhoto>(`/events/${eventId}/photos`, { method: 'POST', body: form });
 }
+
+/** The photo's uploader or the event host only. */
+export const deleteEventPhoto = (eventId: string, photoId: string) =>
+  apiFetch<void>(`/events/${eventId}/photos/${photoId}`, { method: 'DELETE' });

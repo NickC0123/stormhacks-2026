@@ -5,8 +5,9 @@ import { Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useFocusedData } from '@/hooks/useFocusedData';
-import { listEventPhotos, uploadEventPhoto } from '@/lib/photos';
+import { deleteEventPhoto, listEventPhotos, uploadEventPhoto } from '@/lib/photos';
 import { useTheme, type Theme } from '@/theme';
 import type { EventPhoto } from '@/types';
 
@@ -20,12 +21,19 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
   selectionLimit: 10,
 };
 
+type Props = {
+  eventId: string;
+  hostId: string;
+  /** The signed-in user; they can delete their own photos, and the host can delete any. */
+  userId?: string;
+};
+
 /** Photo grid for an event, with a button to add photos from the library. */
-export function EventPhotos({ eventId }: { eventId: string }) {
+export function EventPhotos({ eventId, hostId, userId }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
   const loader = useCallback(() => listEventPhotos(eventId), [eventId]);
-  const { data: photos, loading, error, reload, retry } = useFocusedData(loader, 'Could not load photos.');
+  const { data: photos, loading, error, reload, retry, busyIds, run } = useFocusedData(loader, 'Could not load photos.');
   const [uploading, setUploading] = useState(false);
   const [gridWidth, setGridWidth] = useState(0);
   const [viewing, setViewing] = useState<EventPhoto | null>(null);
@@ -52,6 +60,19 @@ export function EventPhotos({ eventId }: { eventId: string }) {
     }
   }
 
+  const canDelete = (photo: EventPhoto) => userId !== undefined && (userId === photo.author_id || userId === hostId);
+
+  function confirmDelete(photo: EventPhoto) {
+    Alert.alert('Delete photo?', 'It will be removed from the event for everyone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => void run(photo.id, () => deleteEventPhoto(eventId, photo.id), 'Could not delete photo'),
+      },
+    ]);
+  }
+
   const gap = theme.spacing[1];
   const tileSize = gridWidth ? (gridWidth - gap * (COLUMNS - 1)) / COLUMNS : 0;
 
@@ -62,14 +83,27 @@ export function EventPhotos({ eventId }: { eventId: string }) {
           <View style={[styles.grid, { gap }]} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
             {tileSize > 0 &&
               photos.map((photo) => (
-                <Pressable
-                  key={photo.id}
-                  onPress={() => setViewing(photo)}
-                  accessibilityRole="imagebutton"
-                  accessibilityLabel="Open photo"
-                >
-                  <Image source={{ uri: photo.url }} style={[styles.tile, { width: tileSize, height: tileSize }]} />
-                </Pressable>
+                <View key={photo.id} style={busyIds.has(photo.id) && styles.busy}>
+                  <Pressable
+                    onPress={() => setViewing(photo)}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel="Open photo"
+                  >
+                    <Image source={{ uri: photo.url }} style={[styles.tile, { width: tileSize, height: tileSize }]} />
+                  </Pressable>
+                  {canDelete(photo) ? (
+                    <Pressable
+                      onPress={() => confirmDelete(photo)}
+                      disabled={busyIds.has(photo.id)}
+                      hitSlop={theme.spacing[2]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete photo"
+                      style={({ pressed }) => [styles.remove, pressed && styles.removePressed]}
+                    >
+                      <SFSymbolIcon name="xmark" size={12} color="#fff" />
+                    </Pressable>
+                  ) : null}
+                </View>
               ))}
           </View>
         ) : (
@@ -100,6 +134,23 @@ function createStyles(theme: Theme) {
     tile: {
       borderRadius: theme.radius.md,
       backgroundColor: theme.colors.bgSurfaceAlt,
+    },
+    busy: {
+      opacity: theme.opacity.disabled,
+    },
+    remove: {
+      position: 'absolute',
+      top: theme.spacing[1],
+      right: theme.spacing[1],
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    },
+    removePressed: {
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
     },
     viewer: {
       flex: 1,
