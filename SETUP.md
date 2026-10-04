@@ -59,7 +59,7 @@ Put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` 
 
 ### Expenses
 
-Apply `supabase/migrations/20261004000000_expenses.sql` in the hosted SQL editor once.
+Apply `supabase/migrations/20261004000001_expenses.sql` in the hosted SQL editor once.
 It creates the `expenses` table and private `receipts` storage bucket.
 
 Open **Expenses → New expense** to enter details manually or choose a receipt photo.
@@ -72,6 +72,18 @@ The authenticated API provides `GET/POST /api/v1/expenses`,
 Expense date and optional time are local calendar values; scans with only a date
 leave time empty. Item amounts and the overall amount are independent, and parser
 warnings and original JSON are retained for review.
+
+### Event invites
+
+Apply `supabase/migrations/20261004000002_event_invites.sql` in the hosted SQL editor once.
+
+Open an event and choose **Invite friends** to invite accepted friends. Any member can
+invite their own friends. Invites appear under **Invitations** on the Events tab, where
+the friend can join or decline; members can cancel pending invites from the event page.
+
+The authenticated API provides `GET /api/v1/events/{id}` (members and pending invites),
+`POST /api/v1/events/{id}/invites`, `GET /api/v1/invites`,
+`POST /api/v1/invites/{id}/accept`, and `DELETE /api/v1/invites/{id}`.
 
 ### Using a physical phone
 

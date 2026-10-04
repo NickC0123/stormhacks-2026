@@ -90,6 +90,45 @@ export type FriendsOverview = {
   outgoing: Friendship[];
 };
 
+/** Keys match the API JSON exactly. `username` is null only for legacy profiles. */
+export type EventUser = {
+  id: UUID;
+  username: string | null;
+};
+
+export type EventSummary = {
+  id: UUID;
+  title: string;
+  starts_at: string | null;
+};
+
+export type EventListItem = EventSummary & {
+  description: string | null;
+  created_by: UUID;
+  created_at: string;
+};
+
+/** A pending invite as seen by members of the event. */
+export type EventInvite = {
+  id: UUID;
+  user: EventUser;
+  invited_by: EventUser;
+  created_at: string;
+};
+
+/** A pending invite as seen by the person invited. */
+export type IncomingInvite = {
+  id: UUID;
+  event: EventSummary;
+  invited_by: EventUser;
+  created_at: string;
+};
+
+export type EventDetail = EventListItem & {
+  members: EventUser[];
+  invites: EventInvite[];
+};
+
 export type Balance = {
   fromUserId: UUID;
   toUserId: UUID;

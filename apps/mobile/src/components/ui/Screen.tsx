@@ -15,6 +15,8 @@ type Props = {
   /** Enables pull-to-refresh when set. */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /** Set when a navigation header is shown above the screen; it already covers the top inset. */
+  withHeader?: boolean;
   children?: React.ReactNode;
 };
 
@@ -26,6 +28,7 @@ export function Screen({
   titleColor = 'default',
   onRefresh,
   refreshing = false,
+  withHeader = false,
   children,
 }: Props) {
   const theme = useTheme();
@@ -37,7 +40,7 @@ export function Screen({
   return (
     <SafeAreaView
       style={styles.container}
-      edges={['top', 'left', 'right']}
+      edges={withHeader ? ['left', 'right'] : ['top', 'left', 'right']}
     >
       <ScrollView
         style={styles.scroll}

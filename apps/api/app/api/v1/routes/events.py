@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -5,6 +6,9 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.auth import CurrentUserDep
 from app.db.supabase import get_supabase
 from app.schemas.event import Event, EventCreate
+from app.schemas.invite import EventDetail, EventInvite, EventUser
+from app.services.event_invites import EventInvitesRepo, EventInvitesRepoDep
+from app.services.friends import FriendsRepoDep
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -67,6 +71,36 @@ def create_event(body: EventCreate, user: CurrentUserDep) -> Event:
     return Event(**created, member_ids=[UUID(user.id)])
 
 
-@router.get("/{event_id}", response_model=Event)
-def get_event(event_id: UUID, user: CurrentUserDep) -> Event:
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+def get_member_event(repo: EventInvitesRepo, event_id: UUID, user_id: str) -> dict[str, Any]:
+    """The event, or 404 if it doesn't exist or the user isn't a member."""
+    event = repo.get_event(str(event_id))
+    if event is None or not repo.is_member(event["id"], user_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found.")
+    return event
+
+
+@router.get("/{event_id}", response_model=EventDetail)
+def get_event(
+    event_id: UUID, user: CurrentUserDep, repo: EventInvitesRepoDep, friends: FriendsRepoDep
+) -> EventDetail:
+    """Event details with members and pending invites. Members only."""
+    event = get_member_event(repo, event_id, user.id)
+    member_ids = repo.list_member_ids(event["id"])
+    invites = repo.list_event_invites(event["id"])
+    user_ids = {*member_ids}
+    for invite in invites:
+        user_ids.update((invite["invitee_id"], invite["inviter_id"]))
+    profiles = {p["id"]: p for p in friends.get_profiles(list(user_ids))}
+    return EventDetail(
+        **event,
+        members=[EventUser.lookup(profiles, member_id) for member_id in member_ids],
+        invites=[
+            EventInvite(
+                id=invite["id"],
+                user=EventUser.lookup(profiles, invite["invitee_id"]),
+                invited_by=EventUser.lookup(profiles, invite["inviter_id"]),
+                created_at=invite["created_at"],
+            )
+            for invite in invites
+        ],
+    )

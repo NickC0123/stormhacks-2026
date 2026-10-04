@@ -24,9 +24,7 @@ export default function NewEventScreen() {
         method: 'POST',
         body: JSON.stringify({ title: eventTitle, description: description.trim() || null }),
       });
-      Alert.alert('Event created', `“${event.title}” was saved.`, [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      router.replace({ pathname: '/events/[eventId]', params: { eventId: event.id } });
     } catch (error) {
       Alert.alert('Could not create event', error instanceof Error ? error.message : 'Please try again.');
     } finally {

@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { AddFriendForm } from '@/components/friends/AddFriendForm';
 import { FriendRow } from '@/components/friends/FriendRow';
 import { Button } from '@/components/ui/Button';
+import { ListGroup } from '@/components/ui/ListGroup';
+import { LoadState } from '@/components/ui/LoadState';
 import type { FriendsState } from '@/hooks/useFriends';
 import { useTheme, type Theme } from '@/theme';
 
@@ -30,19 +32,14 @@ export function FriendsSection({ friends }: Props) {
 
   let body: ReactNode;
   if (!data) {
-    body = loading ? (
-      <ActivityIndicator color={theme.colors.textTertiary} style={styles.loading} />
-    ) : (
-      <View style={styles.group}>
-        <Text style={styles.errorText}>{error ?? 'Could not load friends.'}</Text>
-        <Button label="Try again" variant="secondary" onPress={retry} />
-      </View>
+    body = (
+      <LoadState loading={loading} error={error} fallbackError="Could not load friends." onRetry={retry} />
     );
   } else {
     body = (
       <>
         {data.incoming.length > 0 ? (
-          <Group title="Requests" count={data.incoming.length}>
+          <ListGroup title="Requests" count={data.incoming.length}>
             {data.incoming.map((request) => (
               <FriendRow
                 key={request.id}
@@ -69,11 +66,11 @@ export function FriendsSection({ friends }: Props) {
                 }
               />
             ))}
-          </Group>
+          </ListGroup>
         ) : null}
 
         {data.outgoing.length > 0 ? (
-          <Group title="Sent" count={data.outgoing.length}>
+          <ListGroup title="Sent" count={data.outgoing.length}>
             {data.outgoing.map((request) => (
               <FriendRow
                 key={request.id}
@@ -91,33 +88,31 @@ export function FriendsSection({ friends }: Props) {
                 }
               />
             ))}
-          </Group>
+          </ListGroup>
         ) : null}
 
-        <Group title="Your friends" count={data.friends.length}>
-          {data.friends.length === 0 ? (
-            <Text style={styles.empty}>
-              No friends yet. Add someone by their username above.
-            </Text>
-          ) : (
-            data.friends.map((friend) => (
-              <FriendRow
-                key={friend.id}
-                username={friend.user.username}
-                actions={
-                  <Button
-                    label="Remove"
-                    size="sm"
-                    variant="ghost"
-                    loading={busyIds.has(friend.id)}
-                    onPress={() => confirmRemove(friend.id, friend.user.username)}
-                    accessibilityLabel={`Remove @${friend.user.username} from friends`}
-                  />
-                }
-              />
-            ))
-          )}
-        </Group>
+        <ListGroup
+          title="Your friends"
+          count={data.friends.length}
+          emptyText="No friends yet. Add someone by their username above."
+        >
+          {data.friends.map((friend) => (
+            <FriendRow
+              key={friend.id}
+              username={friend.user.username}
+              actions={
+                <Button
+                  label="Remove"
+                  size="sm"
+                  variant="ghost"
+                  loading={busyIds.has(friend.id)}
+                  onPress={() => confirmRemove(friend.id, friend.user.username)}
+                  accessibilityLabel={`Remove @${friend.user.username} from friends`}
+                />
+              }
+            />
+          ))}
+        </ListGroup>
       </>
     );
   }
@@ -133,20 +128,6 @@ export function FriendsSection({ friends }: Props) {
   );
 }
 
-function Group({ title, count, children }: { title: string; count: number; children: ReactNode }) {
-  const theme = useTheme();
-  const styles = createStyles(theme);
-
-  return (
-    <View style={styles.group}>
-      <Text style={styles.groupTitle} accessibilityRole="header">
-        {title} · {count}
-      </Text>
-      <View>{children}</View>
-    </View>
-  );
-}
-
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     section: {
@@ -155,24 +136,6 @@ function createStyles(theme: Theme) {
     title: {
       ...theme.typography.h4,
       color: theme.colors.textPrimary,
-    },
-    group: {
-      gap: theme.spacing[2],
-    },
-    groupTitle: {
-      ...theme.typography.button,
-      color: theme.colors.textSecondary,
-    },
-    loading: {
-      alignSelf: 'flex-start',
-    },
-    empty: {
-      ...theme.typography.bodySm,
-      color: theme.colors.textSecondary,
-    },
-    errorText: {
-      ...theme.typography.bodySm,
-      color: theme.colors.danger,
     },
   });
 }
