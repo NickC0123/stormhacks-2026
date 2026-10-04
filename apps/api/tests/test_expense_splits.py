@@ -6,9 +6,10 @@ from fastapi.testclient import TestClient
 
 from app.core.auth import CurrentUser, get_current_user
 from app.main import app
-from app.services.event_invites import ExpensePeopleRepo
+from app.services.event_invites import EventInvitesRepo, ExpensePeopleRepo
 from app.services.expense_splits import ExpenseBalancesRepo, balance_dashboard, equal_shares
 from app.services.friends import FriendsRepo
+from app.services.settlements import SettlementsRepo
 from tests.test_event_invites import FakePeopleRepo
 from tests.test_friends import FakeRepo as FakeFriendsRepo
 
@@ -86,6 +87,24 @@ class FakeBalancesRepo(ExpenseBalancesRepo):
         ]
 
 
+class FakeSettlementsRepo(SettlementsRepo):
+    def __init__(self):
+        self.rows = []
+
+    def list_for_user(self, user_id, event_id=None):
+        return [
+            row
+            for row in self.rows
+            if user_id in (row["from_user_id"], row["to_user_id"])
+            and (event_id is None or row["event_id"] == event_id)
+        ]
+
+    def create(self, row):
+        row = {**row, "id": str(uuid4()), "created_at": "2026-10-04T12:00:00Z"}
+        self.rows.append(row)
+        return row
+
+
 @pytest.fixture
 def setup():
     people = FakePeopleRepo("expense")
@@ -100,6 +119,9 @@ def setup():
     app.dependency_overrides[ExpensePeopleRepo] = lambda: people
     app.dependency_overrides[ExpenseBalancesRepo] = lambda: FakeBalancesRepo(people)
     app.dependency_overrides[FriendsRepo] = lambda: friends
+    settlements = FakeSettlementsRepo()
+    app.dependency_overrides[SettlementsRepo] = lambda: settlements
+    app.dependency_overrides[EventInvitesRepo] = lambda: FakePeopleRepo("event")
     sign_in(ALICE)
     yield people, expense_id
     app.dependency_overrides.clear()
@@ -174,3 +196,90 @@ def test_unrelated_users_and_unauthenticated_callers_cannot_read_balances_or_sha
     assert client.get("/api/v1/balances").json() == EMPTY
     app.dependency_overrides.pop(get_current_user)
     assert client.get("/api/v1/balances").status_code == 401
+
+
+def settle(user_id, amount):
+    return client.post("/api/v1/settlements", json={"user_id": user_id, "amount": amount})
+
+
+def person(data, user_id):
+    return next(p for p in data["people"] if p["user"]["id"] == user_id)
+
+
+def test_settlements_reduce_balances_on_both_sides():
+    rows = [expense(ALICE, "90.00", [ALICE, BOB, CAROL])]
+    paid = [
+        {
+            "id": str(uuid4()),
+            "from_user_id": BOB,
+            "to_user_id": ALICE,
+            "amount": "10.00",
+            "currency": "CAD",
+            "created_at": "2026-10-04T12:00:00Z",
+        }
+    ]
+    alice = balance_dashboard(rows, ALICE, {}, paid).model_dump(mode="json")
+    assert alice["totals"][0]["owed_to_you"] == "50.00"
+    assert person(alice, BOB)["owed_to_you"] == "20.00"
+    assert [s["amount"] for s in person(alice, BOB)["settlements"]] == ["-10.00"]
+    bob = balance_dashboard(rows, BOB, {}, paid).model_dump(mode="json")
+    assert bob["totals"][0]["you_owe"] == "20.00"
+    assert [s["amount"] for s in person(bob, ALICE)["settlements"]] == ["10.00"]
+
+
+def test_debtor_settles_up_and_both_balances_return_to_zero(setup):
+    sign_in(BOB)
+    res = settle(ALICE, "30.00")
+    assert res.status_code == 201
+    assert person(res.json(), ALICE)["you_owe"] == "0.00"
+    assert res.json()["totals"][0]["you_owe"] == "0.00"
+    sign_in(ALICE)
+    data = client.get("/api/v1/balances").json()
+    assert person(data, BOB)["owed_to_you"] == "0.00"
+    assert person(data, CAROL)["owed_to_you"] == "30.00"
+    assert settle(BOB, "30.00").status_code == 409  # Already settled.
+
+
+def test_creditor_can_mark_a_debt_paid(setup):
+    res = settle(CAROL, "30.00")
+    assert res.status_code == 201
+    assert person(res.json(), CAROL)["owed_to_you"] == "0.00"
+    sign_in(CAROL)
+    assert total()["you_owe"] == "0.00"
+
+
+def test_new_expenses_after_settling_count_again(setup):
+    people, expense_id = setup
+    assert settle(BOB, "30.00").status_code == 201
+    people.resources[expense_id]["amount"] = "120.00"
+    assert person(client.get("/api/v1/balances").json(), BOB)["owed_to_you"] == "10.00"
+
+
+def test_stale_amount_and_strangers_are_rejected(setup):
+    assert settle(BOB, "25.00").status_code == 409
+    assert settle(DAVE, "30.00").status_code == 409
+    assert settle(BOB, "-30.00").status_code == 422
+    sign_in(DAVE)
+    assert settle(ALICE, "30.00").status_code == 409
+    app.dependency_overrides.pop(get_current_user)
+    assert settle(ALICE, "30.00").status_code == 401
+
+
+def test_creditor_e_transfer_contact_is_shown_only_when_visible_and_owed(setup):
+    friends = app.dependency_overrides[FriendsRepo]()
+    friends.profiles[ALICE].update(
+        etransfer_email="alice@example.com",
+        instagram="alice",
+        visible_contacts=["etransfer_email", "instagram"],
+    )
+    friends.profiles[CAROL].update(etransfer_email="carol@example.com", visible_contacts=[])
+    sign_in(BOB)
+    assert person(client.get("/api/v1/balances").json(), ALICE)["payment_contacts"] == [
+        {"kind": "etransfer_email", "value": "alice@example.com"}
+    ]
+    sign_in(ALICE)
+    data = client.get("/api/v1/balances").json()
+    assert person(data, CAROL)["payment_contacts"] == []  # Carol owes Alice, not the reverse.
+    sign_in(BOB)
+    settle(ALICE, "30.00")
+    assert person(client.get("/api/v1/balances").json(), ALICE)["payment_contacts"] == []

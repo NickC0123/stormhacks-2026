@@ -248,6 +248,10 @@ export type BalanceDashboard = {
     you_owe: string;
     owed_to_you: string;
     expenses: { expense_id: string; title: string; amount: string }[];
+    /** Recorded payments. Positive: you paid them. Negative: they paid you. */
+    settlements: { id: string; amount: string; created_at: string }[];
+    /** Their visible e-transfer details, only while you owe them. */
+    payment_contacts: Contact[];
   }[];
   /** Amounts are in CAD; expenses in these currencies have no rate and are left out. */
   unconverted_currencies: string[];

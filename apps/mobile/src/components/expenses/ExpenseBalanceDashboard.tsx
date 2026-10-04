@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { LoadState } from '@/components/ui/LoadState';
 import type { useExpenseBalances } from '@/hooks/useExpenseBalances';
+import { CONTACTS, formatContact } from '@/lib/contacts';
 import { displayName } from '@/lib/events';
-import { formatCents, toCents, unconvertedNote } from '@/lib/expenses';
+import { formatCents, settleUp, toCents, unconvertedNote } from '@/lib/expenses';
 import { useTheme } from '@/theme';
 
 type Props = { balances: ReturnType<typeof useExpenseBalances> };
@@ -14,7 +15,7 @@ type Props = { balances: ReturnType<typeof useExpenseBalances> };
 export function ExpenseBalanceDashboard({ balances }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const { data, loading, error, retry } = balances;
+  const { data, loading, error, retry, busyIds, run } = balances;
   const text = { ...theme.typography.bodySm, color: theme.colors.textSecondary };
   const card = { padding: 16, borderRadius: 12, backgroundColor: theme.colors.bgSurface, gap: 8 };
   return <View style={{ gap: 12 }}>
@@ -33,6 +34,13 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
         const owe = Number(person.you_owe) > 0;
         const owed = Number(person.owed_to_you) > 0;
         const name = displayName(person.user);
+        const amount = owe ? person.you_owe : person.owed_to_you;
+        const confirmSettle = () => Alert.alert(
+          owe ? `Mark as paid to ${name}?` : `Mark ${name}’s debt as paid?`,
+          `${owe ? `You paid ${name}` : `${name} paid you`} ${person.currency} ${amount}. This brings your balance with them to zero.`,
+          [{ text: 'Cancel', style: 'cancel' },
+            { text: 'Mark paid', onPress: () => { void run(key, () => settleUp(person.user.id, amount), 'Could not settle up'); } }],
+        );
         return <View key={key} style={card}>
           <Pressable accessibilityRole="button" accessibilityLabel={`View expenses with ${name}`}
             accessibilityState={{ expanded: expanded === key }} onPress={() => setExpanded(expanded === key ? null : key)}>
@@ -41,6 +49,12 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
               : owed ? `Owes you ${person.currency} ${person.owed_to_you}` : `Even · ${person.currency}`}</Text>
             <Text style={text}>{expanded === key ? 'Hide expenses' : 'View expenses'}</Text>
           </Pressable>
+          {owe ? person.payment_contacts.map((contact) => <Text key={contact.kind} selectable style={text}>
+            {CONTACTS[contact.kind].label}: <Text style={{ color: theme.colors.textPrimary }}>{formatContact(contact.kind, contact.value)}</Text> (press and hold to copy)
+          </Text>) : null}
+          {owe || owed ? <Button label={owe ? 'Settle up' : 'Mark as paid'} size="sm" variant="secondary"
+            accessibilityLabel={owe ? `Settle up with ${name}` : `Mark ${name}’s debt as paid`}
+            loading={busyIds.has(key)} onPress={confirmSettle} /> : null}
           {expanded === key ? person.expenses.map((expense) => {
             const cents = toCents(expense.amount) ?? 0;
             return <Pressable key={expense.expense_id} accessibilityRole="button"
@@ -50,10 +64,17 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
               <Text style={text}>{cents < 0 ? 'You owe' : 'Owes you'} {person.currency} {formatCents(Math.abs(cents))}</Text>
             </Pressable>;
           }) : null}
+          {expanded === key ? person.settlements.map((payment) => {
+            const cents = toCents(payment.amount) ?? 0;
+            return <View key={payment.id} style={{ paddingVertical: 8 }}>
+              <Text style={{ color: theme.colors.textPrimary }}>Settled up</Text>
+              <Text style={text}>{cents > 0 ? `You paid ${name}` : `${name} paid you`} {person.currency} {formatCents(Math.abs(cents))}</Text>
+            </View>;
+          }) : null}
         </View>;
       })}
       {unconvertedNote(data.unconverted_currencies) ? <Text style={text}>{unconvertedNote(data.unconverted_currencies)}</Text> : null}
-      <Text style={text}>All amounts are in CAD; other currencies are converted at approximate rates. Opposite amounts with the same person cancel out. Balances refresh while this tab is open.</Text>
+      <Text style={text}>All amounts are in CAD; other currencies are converted at approximate rates. Opposite amounts with the same person cancel out, and payments marked as paid are subtracted. Balances refresh while this tab is open.</Text>
       <Button label="Refresh balances" variant="ghost" loading={balances.refreshing} onPress={balances.refresh} />
     </> : null}
   </View>;
