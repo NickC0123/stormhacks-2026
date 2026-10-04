@@ -471,6 +471,8 @@ export const sizes = {
   controlMd: 40,
   controlLg: 48,
   avatarMd: 40,
+  /** Profile header avatar (own profile tab and friends' profiles). */
+  avatarXl: 100,
   /** Overlapping member stack on event detail (Figma 38:280, enlarged for touch). */
   avatarStack: 48,
   /** Smaller facepile on the event detail header. */
