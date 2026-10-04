@@ -66,6 +66,9 @@ class ExpenseWrite(BaseModel):
 
 
 class Expense(ExpenseWrite):
+    # Rows come from select("*"), so database-only columns such as split_customized are dropped.
+    model_config = ConfigDict(extra="ignore")
+
     id: UUID
     created_by: UUID
     created_at: datetime

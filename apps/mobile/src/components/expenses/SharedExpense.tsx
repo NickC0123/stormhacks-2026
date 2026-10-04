@@ -20,7 +20,7 @@ export function SharedExpense({ expense }: { expense: Expense }) {
       <Text style={{ color: theme.colors.textSecondary }}>{expense.date}{expense.time ? ` · ${expense.time.slice(0, 5)}` : ''}</Text>
       <Text style={{ color: theme.colors.textSecondary }}>Shared with you. The creator manages expense details.</Text>
       {expense.receipt_image_path ? <>
-        <LoadState loading={receipt.loading} error={receipt.error} fallbackError="Could not load receipt image." onRetry={receipt.retry} />
+        {receipt.loading || receipt.error ? <LoadState loading={receipt.loading} error={receipt.error} fallbackError="Could not load receipt image." onRetry={receipt.retry} /> : null}
         {receipt.data ? <Image source={{ uri: receipt.data.url }} style={{ height: 220, width: '100%' }} resizeMode="contain" /> : null}
       </> : null}
       {expense.items.map((item, index) => <Text key={item.id ?? index} style={{ color: theme.colors.textPrimary }}>
