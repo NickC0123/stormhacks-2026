@@ -74,6 +74,27 @@ export type Profile = {
   display_name: string;
 };
 
+export type ContactKind = 'instagram' | 'facebook' | 'whatsapp' | 'etransfer_email' | 'etransfer_phone';
+
+/** One of the signed-in user's contact fields. Others only see it when `visible`. */
+export type ContactSetting = {
+  kind: ContactKind;
+  value: string | null;
+  visible: boolean;
+};
+
+export type Contact = {
+  kind: ContactKind;
+  value: string;
+};
+
+/** Another user's profile, with only the contacts they chose to show. */
+export type PublicProfile = {
+  id: UUID;
+  username: string | null;
+  contacts: Contact[];
+};
+
 export type FriendUser = {
   id: UUID;
   username: string;
