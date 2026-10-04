@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SplitPicker, useSplitDraft } from '@/components/expenses/SplitPicker';
 import { PeopleManager } from '@/components/people/PeopleManager';
 import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
@@ -309,6 +310,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const [manualEntry, setManualEntry] = useState(false);
   const [scanToast, setScanToast] = useState<string | null>(null);
   const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
+  const splitDraft = useSplitDraft(expenseId ? null : form.event_id);
   const totals = expenseTotal(form);
   const printedTotal = receiptTotalMismatch(totals, form.parsed_receipt);
   const totalSteps = 2;
@@ -499,18 +501,22 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     }
     if (!totals || totals.total === 0) { setError('Add at least one item before saving.'); return; }
     if (totals.total < 0) { setError('The total cannot be negative. Check the item amounts.'); return; }
+    if (!expenseId && splitDraft.selectedIds.length === 0) { setError('Choose at least one person to split this expense.'); return; }
     setBusy(true);
     setError('');
     let currentId = savedId;
     let saved = false;
+    let splitFailures: string[] = [];
     try {
+      const firstSave = !currentId;
       const expense = await saveExpense({
         ...form, title: form.title.trim(), description: form.description?.trim() || null, amount: formatCents(totals.total),
       }, currentId);
       currentId = expense.id;
       setSavedId(currentId);
-      setSplitVersion((version) => version + 1);
       saved = true;
+      if (firstSave && !expenseId) splitFailures = await splitDraft.apply(currentId);
+      setSplitVersion((version) => version + 1);
       if (asset) {
         await attachExpenseReceipt(currentId, asset);
         clear();
@@ -519,6 +525,13 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
       router.back();
       // Wait for the modal dismiss so the toast doesn't play under the closing drawer.
       setTimeout(() => {
+        if (splitFailures.length) {
+          Alert.alert(
+            'Expense created, but some people weren’t updated',
+            `${splitFailures.join('\n')}\n\nOpen the expense to adjust who is splitting it.`,
+          );
+          return;
+        }
         showSnackbar({
           message: created ? 'Expense created successfully.' : 'Expense saved successfully.',
           variant: 'success',
@@ -966,6 +979,18 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 )}
               </>
             )}
+            {isDrawer ? (
+              <>
+                <View style={styles.sectionDivider} />
+                <Text style={styles.sectionLabel}>Split With</Text>
+                <SplitPicker
+                  draft={splitDraft}
+                  totalCents={Math.max(totals?.total ?? 0, 0)}
+                  currency={form.currency || 'CAD'}
+                  disabled={busy}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
 
