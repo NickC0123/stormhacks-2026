@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
-import { attachExpenseReceipt, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, saveExpense, type ExpenseEvent } from '@/lib/expenses';
+import { attachExpenseReceipt, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
 import { useTheme, type Theme } from '@/theme';
 import type { ExpenseItem, ExpenseWrite, ItemCategory } from '@/types';
@@ -24,7 +24,6 @@ const categories: { value: ItemCategory; label: string }[] = [
   { value: 'work', label: 'Work' },
   { value: 'other', label: 'Other' },
 ];
-const moneyPattern = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const itemMoneyPattern = /^-?(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const quantityPattern = /^(?:0|[1-9]\d{0,6})(?:\.\d{1,3})?$/;
 const validQuantity = (quantity: ExpenseItem['quantity']) => {
@@ -50,6 +49,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [hasReceipt, setHasReceipt] = useState(false);
   const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
+  const totals = expenseTotal(form);
+  const printedTotal = receiptTotalMismatch(totals, form.parsed_receipt);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +95,6 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         title: fields.title || current.title,
         date: fields.date || current.date,
         time: fields.date ? null : current.time,
-        amount: fields.amount || current.amount,
       }));
     } catch (err) {
       setError(messageOf(err));
@@ -104,8 +104,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   }
 
   function requestScan() {
-    if (form.title || form.items.length || form.amount) {
-      Alert.alert('Use receipt details?', 'This will populate the title, date, currency, amount and items. Review the results before saving.', [
+    if (form.title || form.items.length) {
+      Alert.alert('Use receipt details?', 'This will populate the title, date, currency, items, tax, tip and discount. Review the results before saving.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Use receipt details', onPress: readReceipt },
       ]);
     } else void readReceipt();
@@ -114,7 +114,6 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   async function save() {
     if (busy) return;
     if (!form.title.trim()) { setError('Enter an expense title.'); return; }
-    if (!moneyPattern.test(form.amount)) { setError('Enter an amount with up to two decimal places.'); return; }
     if (!/^[A-Z]{3}$/.test(form.currency)) { setError('Enter a three-letter currency, such as CAD or CHF.'); return; }
     const date = new Date(`${form.date}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== form.date) {
@@ -129,12 +128,15 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     if (form.items.some((item) => !validQuantity(item.quantity))) {
       setError('Each item quantity must be greater than zero, with up to three decimal places.'); return;
     }
+    if (!totals || totals.total < 0) { setError('The total cannot be negative. Check the item amounts.'); return; }
     setBusy(true);
     setError('');
     let currentId = savedId;
     let saved = false;
     try {
-      const expense = await saveExpense({ ...form, title: form.title.trim(), description: form.description?.trim() || null }, currentId);
+      const expense = await saveExpense({
+        ...form, title: form.title.trim(), description: form.description?.trim() || null, amount: formatCents(totals.total),
+      }, currentId);
       currentId = expense.id;
       setSavedId(currentId);
       saved = true;
@@ -189,7 +191,6 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         <Field label="Date (YYYY-MM-DD)" value={form.date} onChangeText={(value) => field('date', value)} styles={styles} editable={!busy} />
         <Field label="Time (HH:MM, optional)" value={form.time ?? ''} onChangeText={(value) => field('time', value || null)} styles={styles} editable={!busy} />
         <Field label="Currency" value={form.currency} onChangeText={(value) => field('currency', value.toUpperCase())} styles={styles} editable={!busy} maxLength={3} />
-        <Field label="Overall amount" value={form.amount} onChangeText={(value) => field('amount', value)} styles={styles} editable={!busy} keyboardType="decimal-pad" />
         <Text style={styles.label}>Event (optional)</Text>
         {eventError ? <Text style={styles.warning}>Could not load events: {eventError}</Text> : null}
         {form.event_id && !events.some((event) => event.id === form.event_id) ? <Text style={styles.hint}>An event is selected. Choose an available event or No event.</Text> : null}
@@ -220,6 +221,18 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           <Action label="Remove item" onPress={() => field('items', form.items.filter((_, i) => i !== index))} disabled={busy} styles={styles} />
         </View>)}
         <Action label="Add item" onPress={() => field('items', [...form.items, { name: '', category: 'other', amount: '', quantity: '1' }])} disabled={busy} styles={styles} />
+        <Text style={styles.heading}>Overall amount</Text>
+        {totals ? <View style={styles.summary}>
+          <SummaryRow label="Items" value={formatCents(totals.subtotal)} styles={styles} />
+          {totals.discount ? <SummaryRow label="Discount" value={formatCents(-totals.discount)} styles={styles} /> : null}
+          {totals.tax ? <SummaryRow label="Tax" value={formatCents(totals.tax)} styles={styles} /> : null}
+          {totals.tip ? <SummaryRow label="Tip" value={formatCents(totals.tip)} styles={styles} /> : null}
+          <SummaryRow label={`Total (${form.currency || 'CAD'})`} value={formatCents(totals.total)} styles={styles} total />
+        </View> : <Text style={styles.hint}>Fix the item amounts to see the total.</Text>}
+        {totals && printedTotal !== null ? <Text style={styles.warning} accessibilityRole="alert">
+          Total mismatch: the receipt total is {formatCents(printedTotal)}, but the items, discount, tax and tip add up to {formatCents(totals.total)}. Check the items before saving.
+        </Text> : null}
+        {!form.items.length ? <Text style={styles.hint}>The total is calculated from the items. Add an item to set it.</Text> : null}
         {error ? <Text style={styles.warning}>{error}</Text> : null}
         {busy ? <ActivityIndicator /> : null}
         <Action label="Save expense" onPress={save} disabled={busy} styles={styles} primary />
@@ -231,6 +244,12 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
 type Styles = ReturnType<typeof createStyles>;
 function Field({ label, styles, ...props }: React.ComponentProps<typeof TextInput> & { label: string; styles: Styles }) {
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} {...props} style={styles.input} /></View>;
+}
+function SummaryRow({ label, value, styles, total }: { label: string; value: string; styles: Styles; total?: boolean }) {
+  return <View style={styles.summaryRow} accessible accessibilityLabel={`${label}: ${value}`}>
+    <Text style={total ? styles.totalText : styles.text}>{label}</Text>
+    <Text style={total ? styles.totalText : styles.text}>{value}</Text>
+  </View>;
 }
 function Action({ label, onPress, disabled, styles, primary }: { label: string; onPress: () => void; disabled?: boolean; styles: Styles; primary?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, primary && styles.primary, disabled && { opacity: 0.5 }]}>
@@ -260,5 +279,8 @@ function createStyles(theme: Theme) {
     itemRow: { flexDirection: 'row', gap: theme.spacing[3] },
     quantity: { flex: 1 },
     amount: { flex: 2 },
+    summary: { gap: theme.spacing[2], padding: theme.spacing[3], borderRadius: theme.radius.lg, backgroundColor: theme.colors.bgSurfaceAlt },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing[3] },
+    totalText: { ...theme.typography.bodyStrong, color: theme.colors.textPrimary },
   });
 }
