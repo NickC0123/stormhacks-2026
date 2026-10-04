@@ -30,7 +30,7 @@ GEMINI_JSON = {
         {
             "description": "LATTE",
             "normalized_name": "Latte",
-            "category": "coffee",
+            "category": "food_drinks",
             "quantity": 2.0,
             "unit_price": "5.00",
             "line_total": "10.00",
@@ -38,7 +38,7 @@ GEMINI_JSON = {
         {
             "description": "SANDWICH",
             "normalized_name": "Sandwich",
-            "category": "food",
+            "category": "food_drinks",
             "quantity": 1.0,
             "unit_price": "8",
             "line_total": "$8.00",
@@ -71,7 +71,7 @@ def test_scan_returns_receipt_json(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["items"][0] == {
         "description": "LATTE",
         "normalized_name": "Latte",
-        "category": "coffee",
+        "category": "food_drinks",
         "quantity": 2,
         "unit_price": "5.00",
         "line_total": "10.00",

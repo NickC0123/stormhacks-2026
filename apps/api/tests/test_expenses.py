@@ -101,7 +101,7 @@ def body():
         "currency": "CAD",
         "amount": "12.50",
         "event_id": None,
-        "items": [{"name": "Sandwich", "category": "food", "amount": "12.50"}],
+        "items": [{"name": "Sandwich", "category": "food_drinks", "amount": "12.50"}],
     }
 
 
@@ -122,6 +122,36 @@ def test_manual_expense_without_event_saved_and_listed(db, body):
     assert client.get(f"/api/v1/expenses/{expense['id']}").json() == expense
 
 
+@pytest.mark.parametrize(
+    "category",
+    [
+        "groceries", "food_drinks", "transportation", "shopping", "entertainment",
+        "housing", "bills_utilities", "subscriptions", "health_fitness", "education",
+        "personal_care", "work", "other",
+    ],
+)
+def test_current_expense_categories_are_accepted(db, body, category):
+    body["items"][0]["category"] = category
+    response = create(body)
+    assert response.status_code == 201
+    assert response.json()["items"][0]["category"] == category
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("coffee", "food_drinks"), ("food", "food_drinks"),
+        ("drinks", "food_drinks"), ("alcohol", "food_drinks"),
+        ("transport", "transportation"),
+    ],
+)
+def test_legacy_expense_categories_are_normalized(db, body, old, new):
+    body["items"][0]["category"] = old
+    response = create(body)
+    assert response.status_code == 201
+    assert response.json()["items"][0]["category"] == new
+
+
 def test_scanned_fields_and_original_json_saved_with_printed_total(db, body):
     parsed = {
         "merchant": "Berghotel Grosse Scheidegg",
@@ -131,7 +161,7 @@ def test_scanned_fields_and_original_json_saved_with_printed_total(db, body):
             {
                 "description": "2xLatte",
                 "normalized_name": "Latte Macchiato",
-                "category": "coffee",
+                "category": "food_drinks",
                 "quantity": 2,
                 "unit_price": "4.50",
                 "line_total": "9.00",
@@ -155,7 +185,7 @@ def test_scanned_fields_and_original_json_saved_with_printed_total(db, body):
             "items": [
                 {
                     "name": "Latte Macchiato",
-                    "category": "coffee",
+                    "category": "food_drinks",
                     "amount": "9.00",
                     "quantity": 2,
                     "unit_price": "4.50",
@@ -302,7 +332,7 @@ def test_discount_items_can_be_negative_while_total_stays_nonnegative(db, body):
             **body,
             "amount": "10.50",
             "items": [
-                {"name": "Meal", "category": "food", "amount": "12.50"},
+                {"name": "Meal", "category": "food_drinks", "amount": "12.50"},
                 {"name": "Coupon", "category": "other", "amount": "-2.00", "unit_price": "-2.00"},
             ],
         }

@@ -21,7 +21,7 @@ def set_username(body: UsernameUpdate, user: CurrentUserDep, repo: FriendsRepoDe
     try:
         username = normalize_username(body.username)
     except ValueError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     try:
         return Profile(**repo.save_username(user.id, username))
     except UsernameTakenError as exc:

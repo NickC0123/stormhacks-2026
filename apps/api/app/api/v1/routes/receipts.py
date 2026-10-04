@@ -40,7 +40,9 @@ async def scan_receipt(file: UploadFile, user: CurrentUserDep) -> ParsedReceipt:
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "The uploaded image is empty.")
     if len(data) > MAX_IMAGE_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Images must be 10 MB or smaller.")
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Images must be 10 MB or smaller."
+        )
     mime_type = detect_image_type(data)
     if mime_type is None:
         raise HTTPException(

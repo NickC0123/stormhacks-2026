@@ -5,17 +5,34 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, model_validator
 
-ItemCategory = Literal[
-    "coffee",
-    "food",
-    "drinks",
-    "alcohol",
+
+def _normalize_category(value: Any) -> Any:
+    if isinstance(value, str):
+        return {
+            "coffee": "food_drinks",
+            "food": "food_drinks",
+            "drinks": "food_drinks",
+            "alcohol": "food_drinks",
+            "transport": "transportation",
+        }.get(value, value)
+    return value
+
+
+ItemCategory = Annotated[Literal[
     "groceries",
-    "transport",
-    "entertainment",
+    "food_drinks",
+    "transportation",
     "shopping",
+    "entertainment",
+    "housing",
+    "bills_utilities",
+    "subscriptions",
+    "health_fitness",
+    "education",
+    "personal_care",
+    "work",
     "other",
-]
+], BeforeValidator(_normalize_category)]
 
 
 def _parse_money(value: Any) -> Any:

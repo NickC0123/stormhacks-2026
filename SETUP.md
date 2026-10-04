@@ -61,6 +61,8 @@ Put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` 
 
 Apply `supabase/migrations/20261004000001_expenses.sql` in the hosted SQL editor once.
 It creates the `expenses` table and private `receipts` storage bucket.
+Apply `supabase/migrations/20261004000003_expense_categories.sql` after it to
+update any saved items that use the previous category names.
 
 Open **Expenses → New expense** to enter details manually or choose a receipt photo.
 **Scan and fill expense** uses the existing parser to populate editable fields;

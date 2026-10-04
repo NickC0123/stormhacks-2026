@@ -30,14 +30,18 @@ export type Receipt = {
 };
 
 export type ItemCategory =
-  | 'coffee'
-  | 'food'
-  | 'drinks'
-  | 'alcohol'
   | 'groceries'
-  | 'transport'
-  | 'entertainment'
+  | 'food_drinks'
+  | 'transportation'
   | 'shopping'
+  | 'entertainment'
+  | 'housing'
+  | 'bills_utilities'
+  | 'subscriptions'
+  | 'health_fitness'
+  | 'education'
+  | 'personal_care'
+  | 'work'
   | 'other';
 
 /** Money values are strings with two decimals, e.g. "10.00". Keys match the API JSON exactly. */

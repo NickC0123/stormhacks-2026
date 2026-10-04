@@ -118,7 +118,9 @@ def attach_receipt(expense_id: UUID, file: UploadFile, user: CurrentUserDep) -> 
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "The uploaded image is empty.")
     if len(data) > MAX_IMAGE_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Images must be 10 MB or smaller.")
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Images must be 10 MB or smaller."
+        )
     mime = detect_image_type(data)
     if mime is None:
         raise HTTPException(

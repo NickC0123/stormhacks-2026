@@ -68,7 +68,7 @@ def send_request(
     try:
         username = normalize_username(body.username)
     except ValueError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     target = repo.get_profile_by_username(username)
     if target is None:

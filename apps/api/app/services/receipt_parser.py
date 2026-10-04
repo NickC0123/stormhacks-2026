@@ -17,7 +17,9 @@ PROMPT = """You are reading a photo of a purchase receipt. Extract it into the J
 Rules:
 - description: the item text exactly as printed. normalized_name: a clean, human-readable name
   (expand abbreviations, title case), e.g. "LG ICD LATTE" -> "Large Iced Latte".
-- category: pick the closest category for each item; use "other" if unsure.
+- category: pick the closest category for each item from groceries, food_drinks,
+  transportation, shopping, entertainment, housing, bills_utilities, subscriptions,
+  health_fitness, education, personal_care, work, or other. Use "other" if unsure.
 - Money values are strings with exactly two decimals and no currency symbol, e.g. "5.00".
 - quantity is the number of units (1 if not printed). line_total is what that line costs.
 - Item-level discounts or coupons are their own item with a negative line_total.

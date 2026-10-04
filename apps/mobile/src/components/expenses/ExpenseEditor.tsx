@@ -9,7 +9,21 @@ import { scanReceipt } from '@/lib/receipts';
 import { useTheme, type Theme } from '@/theme';
 import type { ExpenseItem, ExpenseWrite, ItemCategory } from '@/types';
 
-const categories: ItemCategory[] = ['coffee', 'food', 'drinks', 'alcohol', 'groceries', 'transport', 'entertainment', 'shopping', 'other'];
+const categories: { value: ItemCategory; label: string }[] = [
+  { value: 'groceries', label: 'Groceries' },
+  { value: 'food_drinks', label: 'Food & Drinks' },
+  { value: 'transportation', label: 'Transportation' },
+  { value: 'shopping', label: 'Shopping' },
+  { value: 'entertainment', label: 'Entertainment' },
+  { value: 'housing', label: 'Housing' },
+  { value: 'bills_utilities', label: 'Bills & Utilities' },
+  { value: 'subscriptions', label: 'Subscriptions' },
+  { value: 'health_fitness', label: 'Health & Fitness' },
+  { value: 'education', label: 'Education' },
+  { value: 'personal_care', label: 'Personal Care' },
+  { value: 'work', label: 'Work' },
+  { value: 'other', label: 'Other' },
+];
 const moneyPattern = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const itemMoneyPattern = /^-?(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Please try again.';
@@ -183,11 +197,11 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           <Field label={`Item ${index + 1} name`} value={item.name} onChangeText={(name) => editItem(index, { name })} styles={styles} editable={!busy} />
           <Field label="Item amount" value={item.amount} onChangeText={(amount) => editItem(index, { amount })} styles={styles} editable={!busy} keyboardType="decimal-pad" />
           <Text style={styles.label}>Category</Text>
-          <View style={styles.choices}>{categories.map((category) => <Pressable
-            key={category} disabled={busy} onPress={() => editItem(index, { category })}
-            accessibilityRole="radio" accessibilityState={{ selected: item.category === category }}
-            style={[styles.choice, item.category === category && styles.selected]}
-          ><Text style={styles.text}>{category}</Text></Pressable>)}</View>
+          <View style={styles.choices}>{categories.map(({ value, label }) => <Pressable
+            key={value} disabled={busy} onPress={() => editItem(index, { category: value })}
+            accessibilityRole="radio" accessibilityState={{ selected: item.category === value }}
+            style={[styles.choice, item.category === value && styles.selected]}
+          ><Text style={styles.text}>{label}</Text></Pressable>)}</View>
           <Action label="Remove item" onPress={() => field('items', form.items.filter((_, i) => i !== index))} disabled={busy} styles={styles} />
         </View>)}
         <Action label="Add item" onPress={() => field('items', [...form.items, { name: '', category: 'other', amount: '' }])} disabled={busy} styles={styles} />
