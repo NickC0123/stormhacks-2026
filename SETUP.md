@@ -115,7 +115,10 @@ expense. The payer can exclude or include their own share, and at least one part
 Pending invitees enter the split only when they accept. Shares are recalculated from the saved total
 and current participants, with deterministic rounding in cents. Saving a new amount updates the split.
 Moving an expense to another event selects that event's members only if the split was never customized.
-Event membership changes do not rewrite saved expense selections.
+Apply `supabase/migrations/20261004000010_late_event_members_join_expenses.sql` after it: people who
+join an event later are added to that event's existing expenses and share them equally, unless the
+expense's people were changed by hand. Leaving an event does not remove anyone from saved expenses.
+Test it with `apps/api/tests/sql/late_event_members_join_expenses.sql` in an isolated database.
 
 The Expenses tab shows how much each user owes and is owed, grouped by person and currency, plus
 links to the expenses contributing to each balance. Opposite debts with the same person cancel out;
