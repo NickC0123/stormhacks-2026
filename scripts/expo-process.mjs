@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
+const isWindows = process.platform === 'win32';
 const stateDir = resolve('.dev');
 const pidFile = resolve(stateDir, 'expo.pid');
 const logFile = resolve(stateDir, 'expo.log');
@@ -27,6 +28,9 @@ if (process.argv[2] === 'start') {
   const child = spawn('npm', ['--prefix', 'apps/mobile', 'run', 'start', '--', '--host', 'lan'], {
     cwd: resolve('.'),
     detached: true,
+    // On Windows npm is npm.cmd, which Node can only launch through a shell.
+    shell: isWindows,
+    windowsHide: true,
     stdio: ['ignore', log, log],
     env: { ...process.env, EXPO_NO_TELEMETRY: '1' },
   });
@@ -46,7 +50,12 @@ if (process.argv[2] === 'start') {
   }
 } else if (process.argv[2] === 'stop') {
   if (pid && running(pid)) {
-    process.kill(-pid, 'SIGTERM');
+    if (isWindows) {
+      // Negative PIDs (process groups) don't exist on Windows; kill the tree instead.
+      spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      process.kill(-pid, 'SIGTERM');
+    }
     console.log('Stopped Expo.');
   }
   if (existsSync(pidFile)) unlinkSync(pidFile);
