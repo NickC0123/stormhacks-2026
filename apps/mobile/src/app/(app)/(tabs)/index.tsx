@@ -2,19 +2,41 @@ import { Link } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
+import { useTheme } from '@/theme';
 
-export default function PlansScreen() {
+export default function EventsScreen() {
+  const theme = useTheme();
+
   return (
-    <Screen title="Plans" description="Upcoming plans and events with friends.">
+    <Screen title="Events" titleVariant="page" titleColor="accent">
       {/* Temporary entry point until plans are loaded from the API. */}
-      <Link href={{ pathname: '/events/[eventId]', params: { eventId: 'test' } }} style={styles.link}>
-        <Text style={styles.linkText}>Open test event</Text>
+      <Link
+        href={{ pathname: '/events/[eventId]', params: { eventId: 'test' } }}
+        style={[
+          styles.link,
+          {
+            marginTop: theme.spacing[6],
+            paddingVertical: theme.spacing[3],
+            borderRadius: theme.radius.md,
+            borderColor: theme.colors.accentStrong,
+          },
+        ]}
+      >
+        <Text style={[styles.linkText, { color: theme.colors.accentStrong, ...theme.typography.body }]}>
+          Open test event
+        </Text>
       </Link>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  link: { marginTop: 24, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#2563eb', textAlign: 'center' },
-  linkText: { color: '#2563eb', fontSize: 16, fontWeight: '600' },
+  link: {
+    borderWidth: 1,
+    textAlign: 'center',
+  },
+  linkText: {
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

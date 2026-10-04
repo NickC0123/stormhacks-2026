@@ -1,18 +1,44 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme, type Theme } from '@/theme';
+
+type TitleVariant = 'default' | 'page';
+
 type Props = {
   title: string;
   description?: string;
+  /** `page` = Inter 48 semibold hero title (e.g. Events). */
+  titleVariant?: TitleVariant;
+  /** When set, overrides the default title color (e.g. accent teal). */
+  titleColor?: 'default' | 'accent';
   children?: React.ReactNode;
 };
 
 /** Placeholder screen shell used while features are being built. */
-export function Screen({ title, description, children }: Props) {
+export function Screen({
+  title,
+  description,
+  titleVariant = 'default',
+  titleColor = 'default',
+  children,
+}: Props) {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const titleStyle = titleVariant === 'page' ? styles.pageTitle : styles.title;
+  const color =
+    titleColor === 'accent' ? theme.colors.accent : theme.colors.textPrimary;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        titleVariant === 'page' && styles.containerPage,
+      ]}
+      edges={['top', 'left', 'right']}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[titleStyle, { color }]}>{title}</Text>
         {description ? <Text style={styles.description}>{description}</Text> : null}
       </View>
       {children}
@@ -20,9 +46,33 @@ export function Screen({ title, description, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  header: { gap: 4 },
-  title: { fontSize: 24, fontWeight: '600' },
-  description: { fontSize: 14, opacity: 0.7 },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingHorizontal: theme.spacing[9], // 36 — page content, not navbar
+      paddingTop: theme.spacing[4],
+      // Room for the floating bottom nav + FAB.
+      paddingBottom: theme.sizes.fab + theme.spacing[10],
+      backgroundColor: theme.colors.bgPage,
+    },
+    containerPage: {
+      // Drop hero titles (Events) down 48px from the safe area.
+      paddingTop: theme.spacing[12],
+    },
+    header: {
+      gap: theme.spacing[1],
+    },
+    title: {
+      ...theme.typography.h2,
+      color: theme.colors.textPrimary,
+    },
+    pageTitle: {
+      ...theme.typography.pageTitle,
+    },
+    description: {
+      ...theme.typography.bodySm,
+      color: theme.colors.textSecondary,
+    },
+  });
+}

@@ -1,0 +1,73 @@
+---
+description: Design system and styling rules for all UI code in this React Native project
+alwaysApply: true
+---
+
+# Design system rules
+
+The full spec is @docs/design-spec.md. It was written for web CSS, so use it for the design decisions (colors, contrast, type roles, spacing scale, component anatomy and states, accessibility), and translate the implementation to React Native using the rules below.
+
+## Hard rules
+
+- Never hard-code colors, font sizes, spacing, radii, shadows, durations, or z-order values in components. Import them from the theme (`src/theme/tokens.ts`, accessed with `useTheme()`).
+- If a needed value does not exist as a token, propose adding it to the theme and the spec first. Do not invent one-off values inline.
+- Build new screens from the components in `src/components/ui/` before creating new ones. If a component is missing, create it there following the spec's component section, not inside a screen file.
+- Components consume semantic tokens only (`colors.textPrimary`, `colors.accent`), never primitives (`teal500`) or raw hex.
+
+## Translating the spec to React Native
+
+| Spec (web) | React Native |
+|---|---|
+| `var(--token)` CSS custom properties | Values from `useTheme()` |
+| `rem` units | Plain numbers (density-independent points). 1rem in the spec = 16 |
+| Media queries and breakpoints | `useWindowDimensions()` with the spec's breakpoint widths in px (sm 640, md 768, lg 1024) |
+| `prefers-color-scheme` and `data-theme` | `useColorScheme()` plus a user override in the theme provider |
+| `:hover`, `:active` | `Pressable` `pressed` state. Hover only matters for web targets |
+| `:focus-visible` ring | `Pressable` `focused` state or the platform focus ring on web/TV. Never remove it |
+| `box-shadow` | Use the theme's shadow tokens. They resolve to `shadow*` props on iOS and `elevation` on Android |
+| `transition` | `Animated` or Reanimated using the duration and easing tokens |
+| ARIA attributes | `accessibilityRole`, `accessibilityLabel`, `accessibilityState`, `accessibilityHint` |
+| `z-index` tokens | Use the layer tokens, and prefer render order over `zIndex` where possible |
+
+## Color rules (non-negotiable)
+
+- The brand accent is teal `#00C3D0`. Icons/labels on an accent fill use `colors.onAccent` (**white**), matching Figma (e.g. the create FAB). Prefer icon-only or short marks on accent fills.
+- Do not use the raw accent as text, icon, or thin-indicator color on neutral backgrounds unless a Figma screen specifies it. Prefer `colors.accentStrong`. The floating bottom nav active tab is an approved exception and uses `colors.navItemActive` (brand teal).
+- When Figma and this file disagree on a visual detail, **Figma wins** — update this file and `docs/design-spec.md` to match.
+- Every screen must work in light and dark themes. Never assume a white background.
+- Never convey meaning by color alone. Pair status colors with text or an icon.
+
+## Layout and sizing
+
+- Spacing comes only from the spacing scale (4pt base). No arbitrary margins or padding.
+- Minimum touch target is 44pt on iOS and 48dp on Android. Use `hitSlop` if the visual element is smaller.
+- Respect safe areas (`react-native-safe-area-context`) on every screen.
+- Prefer flexbox with `gap` and theme spacing over fixed widths and heights.
+- Support Dynamic Type / font scaling. Do not set `allowFontScaling={false}` unless there is a specific, documented reason.
+
+## Typography
+
+- Use the type roles from the spec (`pageTitle`, display, h1-h4, body, label, caption, and so on) through the shared `Text` / `Screen` APIs. Do not set `fontSize` directly in screens.
+- Fonts must come from the theme's font families: **Inter** (`fonts.sans`) for body/titles, **Rubik** (`fonts.display`) for display accents, **system / SF Pro** (`fonts.ui`) for compact UI chrome like tab labels.
+
+## Components
+
+- Every interactive component implements: default, pressed, focused, disabled, plus loading/error where relevant.
+- Disabled uses the theme's disabled opacity and sets `accessibilityState={{ disabled: true }}`.
+- Icon-only buttons always have an `accessibilityLabel`.
+- Variants and sizes are props (`variant`, `size`), not style overrides from the call site.
+
+## Code conventions
+
+- Styles live next to the component. Use `StyleSheet.create` (or the project's styling library if one is adopted) and generate themed styles from `useTheme()`, not module-level constants that capture one theme.
+- No inline style objects for design values. Dynamic values may be passed as props that map to tokens.
+- Keep components typed. Variant and size props use string-literal unions.
+
+## Before finishing any UI change
+
+- [ ] Only tokens used, no raw colors, numbers for spacing, or font sizes
+- [ ] Reused existing components where possible
+- [ ] Light and dark themes both checked
+- [ ] All states implemented
+- [ ] Touch targets and accessibility labels in place
+- [ ] Renders correctly on a small phone and a tablet width
