@@ -12,10 +12,12 @@ import { useTheme, type Theme } from '@/theme';
 
 type Props = {
   friends: FriendsState;
+  showTitle?: boolean;
+  onNavigate?: () => void;
 };
 
 /** Add-by-username form, pending requests, and the friends list. */
-export function FriendsSection({ friends }: Props) {
+export function FriendsSection({ friends, showTitle = true, onNavigate }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
   const { data, loading, error, busyIds, send, accept, remove, retry } = friends;
@@ -104,7 +106,10 @@ export function FriendsSection({ friends }: Props) {
               key={friend.id}
               username={friend.user.username}
               avatarColor={friend.user.avatar_color}
-              onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: friend.user.id } })}
+              onPress={() => {
+                onNavigate?.();
+                router.push({ pathname: '/users/[userId]', params: { userId: friend.user.id } });
+              }}
               actions={
                 <Button
                   label="Remove"
@@ -124,9 +129,9 @@ export function FriendsSection({ friends }: Props) {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.title} accessibilityRole="header">
+      {showTitle ? <Text style={styles.title} accessibilityRole="header">
         Friends
-      </Text>
+      </Text> : null}
       <AddFriendForm onSend={send} />
       {body}
     </View>
@@ -136,7 +141,7 @@ export function FriendsSection({ friends }: Props) {
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     section: {
-      gap: theme.spacing[6],
+      gap: theme.spacing[4],
     },
     title: {
       ...theme.typography.h4,

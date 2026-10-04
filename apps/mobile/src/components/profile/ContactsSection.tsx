@@ -121,7 +121,7 @@ export function ContactsSection() {
                 disabled={saving}
               />
               <SwitchRow
-                label="Show to friends and event members"
+                label="Visible to friends & event members"
                 value={hasValue && contact.visible}
                 onValueChange={(visible) => toggleVisible(contact.kind, visible)}
                 disabled={saving || !hasValue}
@@ -150,7 +150,7 @@ export function ContactsSection() {
           Contact info
         </Text>
         <Text style={styles.description}>
-          All optional. Only the ones you switch on are shown, so friends can find you or pay you back.
+          Choose which contact and payment details others can see.
         </Text>
       </View>
       {body}
@@ -161,7 +161,7 @@ export function ContactsSection() {
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     section: {
-      gap: theme.spacing[6],
+      gap: theme.spacing[4],
     },
     heading: {
       gap: theme.spacing[1],

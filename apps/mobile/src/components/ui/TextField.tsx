@@ -45,20 +45,31 @@ export function TextField({ label, prefix, helper, error, disabled = false, ...i
         ]}
       >
         {prefix ? (
-          <Text style={styles.prefix} accessibilityElementsHidden importantForAccessibility="no">
-            {prefix}
-          </Text>
+          <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {/* Use the same native text metrics as the editable value so prefixes share its baseline. */}
+            <TextInput
+              value={prefix}
+              editable={false}
+              caretHidden
+              contextMenuHidden
+              accessible={false}
+              autoComplete="off"
+              underlineColorAndroid="transparent"
+              style={[styles.inputText, styles.prefix]}
+            />
+          </View>
         ) : null}
         <TextInput
           {...inputProps}
           editable={!disabled}
+          underlineColorAndroid="transparent"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholderTextColor={theme.colors.textTertiary}
-          accessibilityLabel={label}
+          accessibilityLabel={prefix ? `${label}, prefix ${prefix}` : label}
           accessibilityHint={message ?? undefined}
           accessibilityState={{ disabled }}
-          style={[styles.input, disabled && styles.inputDisabled]}
+          style={[styles.inputText, styles.input, disabled && styles.inputDisabled]}
         />
       </View>
       {message ? (
@@ -85,7 +96,7 @@ function createStyles(theme: Theme) {
     control: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: theme.sizes.controlMd,
+      minHeight: theme.sizes.touchTarget,
       paddingHorizontal: theme.spacing[3],
       gap: theme.spacing[1],
       backgroundColor: theme.colors.bgSurface,
@@ -102,15 +113,22 @@ function createStyles(theme: Theme) {
     controlDisabled: {
       backgroundColor: theme.colors.bgSurfaceAlt,
     },
+    inputText: {
+      fontFamily: theme.typography.body.fontFamily,
+      fontSize: theme.typography.body.fontSize,
+      minHeight: theme.sizes.touchTarget,
+      paddingHorizontal: 0,
+      paddingVertical: theme.spacing[2],
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    },
     prefix: {
-      ...theme.typography.body,
-      color: theme.colors.textTertiary,
+      color: theme.colors.textSecondary,
     },
     input: {
       flex: 1,
-      ...theme.typography.body,
+      minWidth: 0,
       color: theme.colors.textPrimary,
-      paddingVertical: theme.spacing[2],
     },
     inputDisabled: {
       color: theme.colors.textDisabled,

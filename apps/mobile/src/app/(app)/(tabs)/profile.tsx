@@ -1,7 +1,10 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FriendsSection } from '@/components/friends/FriendsSection';
 import { ContactsSection } from '@/components/profile/ContactsSection';
+import { ProfileDrawer } from '@/components/profile/ProfileDrawer';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { useFriends } from '@/hooks/useFriends';
@@ -16,51 +19,98 @@ export default function ProfileScreen() {
   const friends = useFriends();
   const theme = useTheme();
   const styles = createStyles(theme);
+  const [drawer, setDrawer] = useState<'friends' | 'settings' | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
+  const displayName = profile?.display_name?.trim();
+  const name = (displayName && !displayName.includes('@') ? displayName : profile?.username) || 'Your profile';
+  const accent = theme.colors.avatarAccent[profile?.avatar_color ?? 'blue'];
+  const requests = friends.data?.incoming.length ?? 0;
+  const friendCount = friends.data?.friends.length;
 
   async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) Alert.alert('Could not sign out', error.message);
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (err) {
+      setSignOutError(err instanceof Error ? err.message : 'Could not sign out. Please try again.');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
-  const name = profile?.display_name?.trim() || profile?.username || 'Profile';
-  const signedInAs = session?.user.email
-    ? `Signed in as ${session.user.email}`
-    : undefined;
-
-  return (
-    <Screen
-      title={name}
-      titleVariant="page"
-      titleColor="accent"
-      titleAlign="center"
-      description={signedInAs}
-      onRefresh={friends.refresh}
-      refreshing={friends.refreshing}
-      headerLeft={<View />}
-      headerRight={<View />}
-    >
+  return <>
+    <Screen title="Profile" titleVariant="page" titleColor="accent" titleAlign="center" onRefresh={friends.refresh} refreshing={friends.refreshing}
+      headerLeft={<View />} headerRight={<View />}>
       <View style={styles.content}>
-        <FriendsSection friends={friends} />
+        <View style={styles.identity}>
+          <View style={[styles.avatar, { backgroundColor: accent.bg }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <Text style={[styles.initial, { color: accent.fg }]}>{name.charAt(0).toUpperCase()}</Text>
+          </View>
+          <Text style={styles.name}>{name}</Text>
+          {profile?.username ? <Text style={styles.subtitle}>@{profile.username}</Text> : null}
+        </View>
 
-        <ContactsSection />
+        <View style={styles.actions}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open friends${requests ? `, ${requests} pending requests` : ''}`}
+          onPress={() => setDrawer('friends')} style={({ pressed }) => [styles.friendsButton, pressed && styles.pressed]}>
+          <View style={styles.icon}><Ionicons name="people-outline" size={theme.sizes.iconLg} color={theme.colors.accentStrong} /></View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Friends</Text>
+            <Text style={styles.subtitle}>{friendCount === undefined ? 'Add and connect' : `${friendCount} friend${friendCount === 1 ? '' : 's'}`} </Text>
+          </View>
+          {requests ? <View style={styles.badge}><Text style={styles.badgeText}>{requests}</Text></View> : null}
+        </Pressable>
 
-        <View style={styles.account}>
-          <Button label="Sign out" variant="secondary" onPress={signOut} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Open contact and account settings" onPress={() => setDrawer('settings')}
+          style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
+          <Ionicons name="settings-outline" size={theme.sizes.iconLg} color={theme.colors.textSecondary} />
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Settings</Text>
+            <Text style={[styles.subtitle, { textAlign: 'center' }]}>Contact & account</Text>
+          </View>
+        </Pressable>
         </View>
       </View>
     </Screen>
-  );
+
+    <ProfileDrawer visible={drawer !== null} title={drawer === 'friends' ? 'Friends' : 'Settings'} onClose={() => setDrawer(null)}
+      onRefresh={drawer === 'friends' ? friends.refresh : undefined} refreshing={friends.refreshing}>
+      {drawer === 'friends' ? <FriendsSection friends={friends} showTitle={false} onNavigate={() => setDrawer(null)} /> : drawer === 'settings' ? <>
+        <ContactsSection />
+        <View style={styles.account}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Account</Text>
+          {session?.user.email ? <Text style={styles.accountEmail}>Signed in as {session.user.email}</Text> : null}
+          {signOutError ? <Text accessibilityRole="alert" style={styles.error}>{signOutError}</Text> : null}
+          <Button label="Sign out" variant="danger" fullWidth loading={signingOut} onPress={() => { void signOut(); }} />
+        </View>
+      </> : null}
+    </ProfileDrawer>
+  </>;
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    content: {
-      marginTop: theme.spacing[8],
-      gap: theme.spacing[12],
-    },
-    account: {
-      alignItems: 'flex-start',
-      gap: theme.spacing[3],
-    },
+    content: { marginTop: theme.spacing[6], gap: theme.spacing[4] },
+    identity: { alignItems: 'center', gap: theme.spacing[2], paddingVertical: theme.spacing[6], marginBottom: theme.spacing[3] },
+    avatar: { width: theme.sizes.avatarMd * 2.5, height: theme.sizes.avatarMd * 2.5, borderRadius: theme.radius.full, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    actions: { flexDirection: 'row', gap: theme.spacing[3] },
+    initial: { ...theme.typography.h1 },
+    name: { ...theme.typography.h2, color: theme.colors.textPrimary, textAlign: 'center' },
+    subtitle: { ...theme.typography.bodySm, color: theme.colors.textSecondary },
+    friendsButton: { flex: 1, alignItems: 'center', gap: theme.spacing[3], padding: theme.spacing[5], minHeight: theme.sizes.touchTarget, backgroundColor: theme.colors.accentSubtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.borderSubtle },
+    settingsButton: { flex: 1, alignItems: 'center', gap: theme.spacing[3], padding: theme.spacing[5], minHeight: theme.sizes.touchTarget, backgroundColor: theme.colors.bgSurface, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.borderSubtle },
+    icon: { padding: theme.spacing[2], borderRadius: theme.radius.lg, backgroundColor: theme.colors.bgSurface },
+    rowText: { gap: theme.spacing[1], alignItems: 'center' },
+    rowTitle: { ...theme.typography.bodyStrong, color: theme.colors.textPrimary },
+    badge: { position: 'absolute', top: theme.spacing[3], right: theme.spacing[3], minWidth: theme.spacing[6], minHeight: theme.spacing[6], paddingHorizontal: theme.spacing[2], alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.full, backgroundColor: theme.colors.accentStrong },
+    badgeText: { ...theme.typography.caption, color: theme.colors.onAccent },
+    pressed: { opacity: 0.75 },
+    account: { gap: theme.spacing[3], borderTopWidth: 1, borderTopColor: theme.colors.borderSubtle, paddingTop: theme.spacing[4] },
+    sectionTitle: { ...theme.typography.h4, color: theme.colors.textPrimary },
+    accountEmail: { ...theme.typography.caption, color: theme.colors.textTertiary },
+    error: { ...theme.typography.bodySm, color: theme.colors.danger },
   });
 }
