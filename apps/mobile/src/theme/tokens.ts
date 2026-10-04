@@ -134,6 +134,12 @@ export type ThemeColors = {
   overlay: string;
   /** Full-screen photo lightbox background (always near-black). */
   photoViewer: string;
+  /** Text and icons drawn over photos in the lightbox / stories (always white). */
+  onPhotoViewer: string;
+  /** Unfilled part of the story progress bars. */
+  storyTrack: string;
+  /** Dim layer behind story header text so it reads over bright photos. */
+  storyScrim: string;
   /** Spending chart segment per expense category. Always pair with a text label. */
   chartCategory: Record<ItemCategory, string>;
   /** Per-user initials avatar fills keyed by iOS system accent name. */
@@ -216,6 +222,9 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       // Figma Miscellaneous/Alert - Overlay, darkened for night.
       overlay: 'rgba(0, 0, 0, 0.45)',
       photoViewer: primitives.gray950,
+      onPhotoViewer: primitives.gray0,
+      storyTrack: 'rgba(255, 255, 255, 0.35)',
+      storyScrim: 'rgba(0, 0, 0, 0.35)',
       chartCategory: chartCategoryColors(scheme),
       avatarAccent: avatarAccentColors(scheme),
     };
@@ -255,6 +264,9 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     // Figma Miscellaneous/Alert - Overlay ≈ #29293a @ 23%
     overlay: 'rgba(41, 41, 58, 0.23)',
     photoViewer: primitives.gray950,
+    onPhotoViewer: primitives.gray0,
+    storyTrack: 'rgba(255, 255, 255, 0.35)',
+    storyScrim: 'rgba(0, 0, 0, 0.35)',
     chartCategory: chartCategoryColors(scheme),
     avatarAccent: avatarAccentColors(scheme),
   };
@@ -457,6 +469,15 @@ export const sizes = {
   /** Select / dropdown menu — ~4 options tall so the list scrolls. */
   dropdownMaxHeight: 176,
   dropdownMinWidth: 192,
+  /** Segmented progress bars across the top of event stories. */
+  storyProgress: 3,
+  /** Downward drag that closes the stories viewer. */
+  storySwipeDismiss: 120,
+  /** Photo archive grid: tall story-shaped tiles, more columns from the md breakpoint. */
+  archiveTileAspectRatio: 9 / 16,
+  archiveColumns: 3,
+  archiveColumnsWide: 5,
+  archiveWideBreakpoint: 768,
 } as const;
 
 export const opacity = {
@@ -477,6 +498,8 @@ export const motion = {
     slow: 400,
     /** One-way skeleton shimmer pulse. */
     skeleton: 900,
+    /** How long each photo shows in event stories before advancing. */
+    storyPhoto: 5000,
   },
   /** cubic-bezier(0.22, 1, 0.36, 1) — tabs + panel reveal */
   easeTab: [0.22, 1, 0.36, 1] as const,

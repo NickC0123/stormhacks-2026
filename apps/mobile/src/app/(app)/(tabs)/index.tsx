@@ -25,7 +25,7 @@ export default function EventsScreen() {
       refreshing={home.refreshing}
       headerLeft={
         // SF Symbol 􀣔 clock.arrow.circlepath
-        <CircleIconButton accessibilityLabel="History" onPress={() => {}}>
+        <CircleIconButton accessibilityLabel="Photo archive" onPress={() => router.push('/archive')}>
           <SFSymbolIcon name="clock.arrow.circlepath" />
         </CircleIconButton>
       }
