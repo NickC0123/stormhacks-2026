@@ -44,6 +44,10 @@ export function SFSymbolIcon({ name, size, color }: Props) {
     return <Ionicons name="close" size={iconSize} color={tint} />;
   }
 
+  if (name === 'square.and.arrow.up') {
+    return <Ionicons name="share-outline" size={iconSize} color={tint} />;
+  }
+
   if (
     name === 'clock.arrow.circlepath' ||
     name === 'clock.arrow.trianglehead.counterclockwise.rotate.90'

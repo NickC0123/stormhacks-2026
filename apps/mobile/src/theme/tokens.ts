@@ -294,6 +294,14 @@ export const sizes = {
   navPaddingX: 24,
   /** Bottom content fade height (Figma Events scrim ~130). */
   bottomFade: 130,
+  /** Native iOS date/time spinner wheel height. */
+  dateTimePicker: 216,
+  /** Thin step progress track under drawer titles. */
+  progressBar: 4,
+  /** Receipt upload dropzone height (Figma Add Expense step 2). */
+  receiptDropzone: 290,
+  /** Upload glyph inside the receipt dropzone. */
+  dropzoneIcon: 38,
 } as const;
 
 export const opacity = {
