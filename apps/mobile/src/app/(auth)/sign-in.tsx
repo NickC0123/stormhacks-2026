@@ -1,5 +1,5 @@
-import { Screen } from '@/components/ui/Screen';
+import { AuthForm } from '@/components/auth/AuthForm';
 
 export default function SignInScreen() {
-  return <Screen title="Sign in" description="Supabase Auth sign-in." />;
+  return <AuthForm mode="sign-in" />;
 }
