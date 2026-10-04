@@ -63,6 +63,33 @@ export type ParsedReceipt = {
   warnings: string[];
 };
 
+/** Keys match the API JSON exactly. `username` is null until the user picks one. */
+export type Profile = {
+  id: UUID;
+  username: string | null;
+  display_name: string;
+};
+
+export type FriendUser = {
+  id: UUID;
+  username: string;
+};
+
+/** A friend or pending request, seen from the signed-in user's side. */
+export type Friendship = {
+  id: UUID;
+  user: FriendUser;
+  status: 'pending' | 'accepted';
+  created_at: string;
+  accepted_at: string | null;
+};
+
+export type FriendsOverview = {
+  friends: Friendship[];
+  incoming: Friendship[];
+  outgoing: Friendship[];
+};
+
 export type Balance = {
   fromUserId: UUID;
   toUserId: UUID;

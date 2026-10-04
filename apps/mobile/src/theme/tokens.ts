@@ -22,6 +22,10 @@ export const primitives = {
   teal500: '#00c3d0',
   teal600: '#00a3ae',
   teal700: '#007a85',
+  red50: '#fef2f2',
+  red500: '#ef4444',
+  red600: '#dc2626',
+  red700: '#b91c1c',
   iosGray6: '#f2f2f7',
   iosGray6Dark: '#1c1c1e',
   glyphPrimary: '#595959',
@@ -38,7 +42,11 @@ export type ThemeColors = {
   textSecondary: string;
   textTertiary: string;
   textInverse: string;
+  textDisabled: string;
   borderSubtle: string;
+  borderDefault: string;
+  borderStrong: string;
+  borderFocus: string;
   accent: string;
   accentHover: string;
   accentActive: string;
@@ -47,6 +55,11 @@ export type ThemeColors = {
   onAccent: string;
   /** Accent-colored text/icons on neutral surfaces when stronger contrast is required. */
   accentStrong: string;
+  danger: string;
+  dangerActive: string;
+  dangerSubtle: string;
+  /** Label color on danger fills. */
+  onDanger: string;
   navBar: string;
   navItemActiveBg: string;
   navItemActive: string;
@@ -64,13 +77,21 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       textSecondary: primitives.gray300,
       textTertiary: primitives.gray400,
       textInverse: primitives.gray900,
+      textDisabled: primitives.gray600,
       borderSubtle: primitives.gray800,
+      borderDefault: primitives.gray700,
+      borderStrong: primitives.gray600,
+      borderFocus: primitives.teal400,
       accent: primitives.teal400,
       accentHover: primitives.teal400,
       accentActive: primitives.teal500,
       accentSubtle: 'rgba(0, 210, 224, 0.15)',
       onAccent: primitives.gray0,
       accentStrong: primitives.teal400,
+      danger: primitives.red500,
+      dangerActive: primitives.red600,
+      dangerSubtle: 'rgba(239, 68, 68, 0.15)',
+      onDanger: primitives.gray0,
       navBar: primitives.iosGray6Dark,
       navItemActiveBg: primitives.gray700,
       navItemActive: primitives.teal400,
@@ -87,13 +108,21 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     textSecondary: primitives.gray600,
     textTertiary: primitives.gray500,
     textInverse: primitives.gray0,
+    textDisabled: primitives.gray400,
     borderSubtle: primitives.gray200,
+    borderDefault: primitives.gray300,
+    borderStrong: primitives.gray400,
+    borderFocus: primitives.teal700,
     accent: primitives.teal500,
     accentHover: primitives.teal400,
     accentActive: primitives.teal600,
     accentSubtle: '#e6fafb',
     onAccent: primitives.gray0,
     accentStrong: primitives.teal700,
+    danger: primitives.red600,
+    dangerActive: primitives.red700,
+    dangerSubtle: primitives.red50,
+    onDanger: primitives.gray0,
     navBar: primitives.iosGray6,
     navItemActiveBg: primitives.gray0,
     navItemActive: primitives.teal500,
@@ -147,6 +176,29 @@ export const typography = {
     fontFamily: fonts.sans.semibold,
     fontSize: 24,
     lineHeight: 30,
+  } satisfies TextStyle,
+  /** Section / card title. */
+  h4: {
+    fontFamily: fonts.sans.semibold,
+    fontSize: 20,
+    lineHeight: 26,
+  } satisfies TextStyle,
+  /** Button labels for sm/md controls. */
+  button: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 14,
+    lineHeight: 20,
+  } satisfies TextStyle,
+  buttonLg: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 16,
+    lineHeight: 24,
+  } satisfies TextStyle,
+  /** Emphasized body text, e.g. list row titles. */
+  bodyStrong: {
+    fontFamily: fonts.sans.semibold,
+    fontSize: 16,
+    lineHeight: 24,
   } satisfies TextStyle,
   body: {
     fontFamily: fonts.sans.regular,
@@ -209,6 +261,11 @@ export const sizes = {
   iconMd: 20,
   iconLg: 24,
   touchTarget: 44,
+  controlSm: 32,
+  controlMd: 40,
+  controlLg: 48,
+  avatarMd: 40,
+  borderWidth: 1,
   fab: 52,
   /** Create FAB plus mark size / stroke weight. */
   fabPlus: 16,
@@ -235,6 +292,10 @@ export const motion = {
   },
 } as const;
 
+export const opacity = {
+  disabled: 0.5,
+} as const;
+
 /** Create-action alert geometry from Figma Alert `11:2077`. */
 export const createActionModal = {
   width: 300,
@@ -257,6 +318,7 @@ export type Theme = {
   shadows: typeof shadows;
   sizes: typeof sizes;
   motion: typeof motion;
+  opacity: typeof opacity;
   createActionModal: typeof createActionModal;
 };
 
@@ -271,6 +333,7 @@ export function createTheme(scheme: ColorScheme): Theme {
     shadows,
     sizes,
     motion,
+    opacity,
     createActionModal,
   };
 }

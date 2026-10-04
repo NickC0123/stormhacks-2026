@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme, type Theme } from '@/theme';
@@ -12,6 +12,9 @@ type Props = {
   titleVariant?: TitleVariant;
   /** When set, overrides the default title color (e.g. accent teal). */
   titleColor?: 'default' | 'accent';
+  /** Enables pull-to-refresh when set. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
   children?: React.ReactNode;
 };
 
@@ -21,6 +24,8 @@ export function Screen({
   description,
   titleVariant = 'default',
   titleColor = 'default',
+  onRefresh,
+  refreshing = false,
   children,
 }: Props) {
   const theme = useTheme();
@@ -42,6 +47,15 @@ export function Screen({
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.textTertiary}
+            />
+          ) : undefined
+        }
       >
         <View style={styles.header}>
           <Text style={[titleStyle, { color }]}>{title}</Text>
