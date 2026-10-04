@@ -66,6 +66,7 @@ class Query:
                 "id": str(uuid4()),
                 "created_at": "2026-10-04T04:00:00Z",
                 "receipt_image_path": None,
+                "split_customized": False,
                 **self.values,
             }
             table.append(row)
@@ -127,6 +128,7 @@ def test_manual_expense_without_event_saved_and_listed(db, body):
     assert expense["items"][0]["id"]
     assert expense["amount"] == "12.50"
     assert expense["time"] == "12:30:00"
+    assert "split_customized" not in expense
     assert client.get("/api/v1/expenses").json() == [expense]
     assert client.get(f"/api/v1/expenses/{expense['id']}").json() == expense
 
@@ -249,6 +251,7 @@ def test_missing_event_rejected(db, body):
         {"currency": "CHF123"},
         {"items": [{"name": "", "amount": "2"}]},
         {"created_by": OTHER},
+        {"split_customized": True},
     ],
 )
 def test_invalid_fields_and_ownership_injection_rejected(db, body, patch):

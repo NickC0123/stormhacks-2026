@@ -19,7 +19,7 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
   const card = { padding: 16, borderRadius: 12, backgroundColor: theme.colors.bgSurface, gap: 8 };
   return <View style={{ gap: 12 }}>
     <Text style={{ ...theme.typography.h2, color: theme.colors.textPrimary }}>Your balances</Text>
-    <LoadState loading={loading} error={error} fallbackError="Could not load balances." onRetry={retry} />
+    {loading || error ? <LoadState loading={loading} error={error} fallbackError="Could not load balances." onRetry={retry} /> : null}
     {data ? <>
       {data.totals.length ? data.totals.map((total) => <View key={total.currency} style={card}>
         <Text style={text}>{total.currency}</Text>
