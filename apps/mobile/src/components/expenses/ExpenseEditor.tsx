@@ -26,6 +26,11 @@ const categories: { value: ItemCategory; label: string }[] = [
 ];
 const moneyPattern = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const itemMoneyPattern = /^-?(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
+const quantityPattern = /^(?:0|[1-9]\d{0,6})(?:\.\d{1,3})?$/;
+const validQuantity = (quantity: ExpenseItem['quantity']) => {
+  const text = String(quantity ?? 1);
+  return quantityPattern.test(text) && Number(text) > 0;
+};
 const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Please try again.';
 
 export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: string; initialEventId?: string }) {
@@ -121,6 +126,9 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     if (form.items.some((item) => !item.name.trim() || !itemMoneyPattern.test(item.amount))) {
       setError('Each item needs a name and an amount with up to two decimal places.'); return;
     }
+    if (form.items.some((item) => !validQuantity(item.quantity))) {
+      setError('Each item quantity must be greater than zero, with up to three decimal places.'); return;
+    }
     setBusy(true);
     setError('');
     let currentId = savedId;
@@ -195,7 +203,14 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         <Text style={styles.heading}>Items (optional)</Text>
         {form.items.map((item, index) => <View key={item.id ?? index} style={styles.item}>
           <Field label={`Item ${index + 1} name`} value={item.name} onChangeText={(name) => editItem(index, { name })} styles={styles} editable={!busy} />
-          <Field label="Item amount" value={item.amount} onChangeText={(amount) => editItem(index, { amount })} styles={styles} editable={!busy} keyboardType="decimal-pad" />
+          <View style={styles.itemRow}>
+            <View style={styles.quantity}>
+              <Field label="Quantity" accessibilityLabel={`Item ${index + 1} quantity`} value={String(item.quantity ?? 1)} onChangeText={(quantity) => editItem(index, { quantity, unit_price: null })} styles={styles} editable={!busy} keyboardType="decimal-pad" />
+            </View>
+            <View style={styles.amount}>
+              <Field label="Item amount" accessibilityLabel={`Item ${index + 1} amount`} value={item.amount} onChangeText={(amount) => editItem(index, { amount, unit_price: null })} styles={styles} editable={!busy} keyboardType="decimal-pad" />
+            </View>
+          </View>
           <Text style={styles.label}>Category</Text>
           <View style={styles.choices}>{categories.map(({ value, label }) => <Pressable
             key={value} disabled={busy} onPress={() => editItem(index, { category: value })}
@@ -204,7 +219,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           ><Text style={styles.text}>{label}</Text></Pressable>)}</View>
           <Action label="Remove item" onPress={() => field('items', form.items.filter((_, i) => i !== index))} disabled={busy} styles={styles} />
         </View>)}
-        <Action label="Add item" onPress={() => field('items', [...form.items, { name: '', category: 'other', amount: '' }])} disabled={busy} styles={styles} />
+        <Action label="Add item" onPress={() => field('items', [...form.items, { name: '', category: 'other', amount: '', quantity: '1' }])} disabled={busy} styles={styles} />
         {error ? <Text style={styles.warning}>{error}</Text> : null}
         {busy ? <ActivityIndicator /> : null}
         <Action label="Save expense" onPress={save} disabled={busy} styles={styles} primary />
@@ -215,7 +230,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
 
 type Styles = ReturnType<typeof createStyles>;
 function Field({ label, styles, ...props }: React.ComponentProps<typeof TextInput> & { label: string; styles: Styles }) {
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props} accessibilityLabel={label} style={styles.input} /></View>;
+  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} {...props} style={styles.input} /></View>;
 }
 function Action({ label, onPress, disabled, styles, primary }: { label: string; onPress: () => void; disabled?: boolean; styles: Styles; primary?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, primary && styles.primary, disabled && { opacity: 0.5 }]}>
@@ -242,5 +257,8 @@ function createStyles(theme: Theme) {
     choice: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.borderSubtle },
     selected: { borderColor: theme.colors.accentStrong, backgroundColor: theme.colors.accentSubtle },
     item: { borderWidth: 1, borderColor: theme.colors.borderSubtle, borderRadius: 10, padding: 12, gap: 10 },
+    itemRow: { flexDirection: 'row', gap: theme.spacing[3] },
+    quantity: { flex: 1 },
+    amount: { flex: 2 },
   });
 }
