@@ -9,14 +9,17 @@ from app.schemas.invite import EventUser
 from app.schemas.split import (
     BalanceDashboard,
     BalanceExpense,
+    BalanceSettlement,
     CurrencyBalance,
     EqualShare,
     ExpenseSplit,
     PersonBalance,
 )
+from app.services.contacts import shown_contacts
 
 CENT = Decimal("0.01")
 ZERO = Decimal("0.00")
+PAYMENT_CONTACTS = ("etransfer_email", "etransfer_phone")
 
 
 def equal_shares(amount: Decimal, member_ids: list[str]) -> dict[str, Decimal]:
@@ -81,7 +84,9 @@ class ExpenseBalancesRepo:
 ExpenseBalancesRepoDep = Annotated[ExpenseBalancesRepo, Depends(ExpenseBalancesRepo)]
 
 
-def balance_dashboard(rows: list[dict], user_id: str, profiles: dict) -> BalanceDashboard:
+def balance_dashboard(
+    rows: list[dict], user_id: str, profiles: dict, settlements: list[dict] | None = None
+) -> BalanceDashboard:
     debts: dict[tuple[str, str], list[BalanceExpense]] = defaultdict(list)
     for row in rows:
         shares = equal_shares(Decimal(str(row["amount"])), row["member_ids"])
@@ -104,13 +109,25 @@ def balance_dashboard(rows: list[dict], user_id: str, profiles: dict) -> Balance
                     amount=-shares[user_id],
                 )
             )
+    paid: dict[tuple[str, str], list[BalanceSettlement]] = defaultdict(list)
+    for row in settlements or []:
+        you_paid = row["from_user_id"] == user_id
+        other_id = row["to_user_id"] if you_paid else row["from_user_id"]
+        amount = Decimal(str(row["amount"])).quantize(CENT)
+        paid[(other_id, row["currency"])].append(
+            BalanceSettlement(
+                id=row["id"], amount=amount if you_paid else -amount, created_at=row["created_at"]
+            )
+        )
     totals = defaultdict(lambda: [ZERO, ZERO])
     people = []
-    for (other_id, currency), expenses in sorted(debts.items()):
-        net = sum((expense.amount for expense in expenses), ZERO)
+    for other_id, currency in sorted(debts.keys() | paid.keys()):
+        expenses, payments = debts.get((other_id, currency), []), paid.get((other_id, currency), [])
+        net = sum((item.amount for item in [*expenses, *payments]), ZERO)
         owe, owed = max(-net, ZERO), max(net, ZERO)
         totals[currency][0] += owe
         totals[currency][1] += owed
+        contacts = shown_contacts(profiles.get(other_id) or {}) if owe else []
         people.append(
             PersonBalance(
                 user=EventUser.lookup(profiles, other_id),
@@ -118,6 +135,8 @@ def balance_dashboard(rows: list[dict], user_id: str, profiles: dict) -> Balance
                 you_owe=owe,
                 owed_to_you=owed,
                 expenses=expenses,
+                settlements=payments,
+                payment_contacts=[c for c in contacts if c.kind in PAYMENT_CONTACTS],
             )
         )
     return BalanceDashboard(

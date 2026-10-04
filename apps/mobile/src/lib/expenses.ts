@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
-import type { Expense, ExpenseWrite, ItemCategory, ParsedReceipt, SpendingSummary } from '@/types';
+import type { BalanceDashboard, Expense, ExpenseWrite, ItemCategory, ParsedReceipt, SpendingSummary } from '@/types';
 
 import { apiFetch } from './api';
 
@@ -32,6 +32,12 @@ export function unconvertedNote(currencies: string[]) {
     ? `Expenses in ${currencies.join(', ')} are not included because there is no CAD exchange rate for them.`
     : null;
 }
+
+/** Records that the whole balance with `userId` was paid; `amount` is the balance shown. */
+export const settleUp = (userId: string, amount: string) => apiFetch<BalanceDashboard>('/settlements', {
+  method: 'POST',
+  body: JSON.stringify({ user_id: userId, amount }),
+});
 
 export type ExpenseEvent = { id: string; title: string };
 export const listExpenseEvents = () => apiFetch<ExpenseEvent[]>('/events');
