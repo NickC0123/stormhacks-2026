@@ -50,7 +50,11 @@ export type ThemeColors = {
   /** Placeholder / hint text — lighter than tertiary. */
   textPlaceholder: string;
   textInverse: string;
+  textDisabled: string;
   borderSubtle: string;
+  borderDefault: string;
+  borderStrong: string;
+  borderFocus: string;
   accent: string;
   accentHover: string;
   accentActive: string;
@@ -85,7 +89,11 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       textTertiary: primitives.gray400,
       textPlaceholder: primitives.gray500,
       textInverse: primitives.gray900,
+      textDisabled: primitives.gray600,
       borderSubtle: primitives.gray800,
+      borderDefault: primitives.gray700,
+      borderStrong: primitives.gray600,
+      borderFocus: primitives.teal400,
       accent: primitives.teal400,
       accentHover: primitives.teal400,
       accentActive: primitives.teal500,
@@ -115,7 +123,11 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     textTertiary: primitives.gray500,
     textPlaceholder: primitives.gray400,
     textInverse: primitives.gray0,
+    textDisabled: primitives.gray400,
     borderSubtle: primitives.gray200,
+    borderDefault: primitives.gray300,
+    borderStrong: primitives.gray400,
+    borderFocus: primitives.teal700,
     accent: primitives.teal500,
     accentHover: primitives.teal400,
     accentActive: primitives.teal600,
@@ -164,13 +176,13 @@ export const radius = {
 } as const;
 
 export const typography = {
-  /** Page hero title — Inter 48 / semibold (Events, etc.). */
+  /** Page hero title — Inter 32 / semibold, centered (Events, Figma `27:4262`). */
   pageTitle: {
     fontFamily: fonts.sans.semibold,
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 32,
+    lineHeight: 38,
     // -3% tracking → fontSize * -0.03 (RN letterSpacing is in px)
-    letterSpacing: 48 * -0.03,
+    letterSpacing: 32 * -0.03,
   } satisfies TextStyle,
   h1: {
     fontFamily: fonts.sans.bold,
@@ -243,17 +255,28 @@ export const sizes = {
   iconMd: 20,
   iconLg: 24,
   touchTarget: 44,
-  fab: 52,
-  /** Create FAB plus mark size / stroke weight. */
+  controlSm: 32,
+  controlMd: 40,
+  controlLg: 48,
+  avatarMd: 40,
+  borderWidth: 1,
+  /** Circular icon buttons (header + search) — Figma Large Bordered Prominent = 50. */
+  fab: 50,
+  /** Plus / search mark size / stroke weight inside circle buttons. */
   fabPlus: 16,
   fabPlusStroke: 2.5,
+  fabIcon: 22,
   navBarHeight: 52,
   /** Floating bottom nav inset from screen edges. */
   navPaddingX: 24,
+  /** Bottom content fade height (Figma Events scrim ~130). */
+  bottomFade: 130,
 } as const;
 
 export const opacity = {
   disabled: 0.5,
+  /** Peak opacity for the Events bottom content fade. */
+  bottomFade: 0.55,
 } as const;
 
 /** Motion tokens (matches design-spec `--duration-*` / transitions.dev). */

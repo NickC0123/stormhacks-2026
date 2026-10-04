@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { apiFetch } from '@/lib/api';
 import { useTheme, type Theme } from '@/theme';
@@ -53,9 +54,20 @@ export default function NewEventScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
-          <Text style={styles.pageTitle} accessibilityRole="header">
-            Add Event
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.pageTitle} accessibilityRole="header">
+              Add Event
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={theme.spacing[2]}
+              onPress={() => router.back()}
+              style={({ pressed }) => [styles.closeButton, pressed && styles.closePressed]}
+            >
+              <SFSymbolIcon name="xmark" color={theme.colors.textPrimary} />
+            </Pressable>
+          </View>
           <Text style={styles.label}>Event Name</Text>
           <View style={[styles.fieldWrap, styles.titleField]}>
             {title.length === 0 ? (
@@ -127,13 +139,27 @@ function createStyles(theme: Theme) {
     form: {
       gap: theme.spacing[3],
     },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[3],
+      marginBottom: theme.spacing[5],
+    },
+    closeButton: {
+      width: theme.sizes.touchTarget,
+      height: theme.sizes.touchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closePressed: {
+      opacity: 0.7,
+    },
     pageTitle: {
       ...theme.typography.h2,
       fontFamily: theme.fonts.sans.semibold,
       color: theme.colors.textPrimary,
       textAlign: 'left',
-      alignSelf: 'stretch',
-      marginBottom: theme.spacing[5],
+      flex: 1,
     },
     label: {
       fontFamily: theme.fonts.sans.semibold,
