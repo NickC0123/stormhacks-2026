@@ -169,7 +169,7 @@ function createStyles(theme: Theme) {
       flexDirection: 'row',
       alignItems: 'center',
       // Bleed to screen edges, then apply nav inset (content is wider-padded).
-      marginHorizontal: -theme.spacing[9],
+      marginHorizontal: -theme.sizes.pagePaddingX,
       paddingHorizontal: theme.sizes.navPaddingX,
       paddingTop: theme.spacing[2],
       paddingBottom: theme.spacing[3],
@@ -191,7 +191,7 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     content: {
-      paddingHorizontal: theme.spacing[9], // 36 — page content, not navbar
+      paddingHorizontal: theme.sizes.pagePaddingX,
       paddingTop: theme.spacing[4],
       // Room for the floating bottom nav + circle button.
       paddingBottom: theme.sizes.fab + theme.spacing[10],

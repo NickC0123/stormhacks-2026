@@ -25,20 +25,25 @@ export function useReceiptPicker() {
               { text: 'Open Settings', onPress: () => Linking.openSettings() },
             ],
       );
-      return;
+      return null;
     }
 
     try {
       const result = await ImagePicker.launchCameraAsync(PICKER_OPTIONS);
-      if (!result.canceled) setAsset(result.assets[0]);
+      if (result.canceled) return null;
+      setAsset(result.assets[0]);
+      return result.assets[0];
     } catch {
       Alert.alert('Camera unavailable', 'This device has no camera. Choose a photo from your library instead.');
+      return null;
     }
   }
 
   async function chooseFromLibrary() {
     const result = await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
-    if (!result.canceled) setAsset(result.assets[0]);
+    if (result.canceled) return null;
+    setAsset(result.assets[0]);
+    return result.assets[0];
   }
 
   return { asset, takePhoto, chooseFromLibrary, clear: () => setAsset(null) };

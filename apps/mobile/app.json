@@ -29,7 +29,8 @@
           "photosPermission": "Allow access to your photos to attach receipts and memories to events.",
           "cameraPermission": "Allow camera access to scan receipts and capture memories."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "scheme": "stormhacks",
     "experiments": {
