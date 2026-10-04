@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FriendsSection } from '@/components/friends/FriendsSection';
 import { ContactsSection } from '@/components/profile/ContactsSection';
 import { ProfileDrawer } from '@/components/profile/ProfileDrawer';
+import { ProfileIdentity } from '@/components/profile/ProfileIdentity';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { useFriends } from '@/hooks/useFriends';
@@ -22,9 +23,6 @@ export default function ProfileScreen() {
   const [drawer, setDrawer] = useState<'friends' | 'settings' | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
-  const displayName = profile?.display_name?.trim();
-  const name = (displayName && !displayName.includes('@') ? displayName : profile?.username) || 'Your profile';
-  const accent = theme.colors.avatarAccent[profile?.avatar_color ?? 'blue'];
   const requests = friends.data?.incoming.length ?? 0;
   const friendCount = friends.data?.friends.length;
 
@@ -45,13 +43,7 @@ export default function ProfileScreen() {
     <Screen title="Profile" titleVariant="page" titleColor="accent" titleAlign="center" onRefresh={friends.refresh} refreshing={friends.refreshing}
       headerLeft={<View />} headerRight={<View />}>
       <View style={styles.content}>
-        <View style={styles.identity}>
-          <View style={[styles.avatar, { backgroundColor: accent.bg }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Text style={[styles.initial, { color: accent.fg }]}>{name.charAt(0).toUpperCase()}</Text>
-          </View>
-          <Text style={styles.name}>{name}</Text>
-          {profile?.username ? <Text style={styles.subtitle}>@{profile.username}</Text> : null}
-        </View>
+        <ProfileIdentity username={profile?.username ?? null} avatarColor={profile?.avatar_color} />
 
         <View style={styles.actions}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open friends${requests ? `, ${requests} pending requests` : ''}`}
@@ -94,11 +86,7 @@ export default function ProfileScreen() {
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     content: { marginTop: theme.spacing[6], gap: theme.spacing[4] },
-    identity: { alignItems: 'center', gap: theme.spacing[2], paddingVertical: theme.spacing[6], marginBottom: theme.spacing[3] },
-    avatar: { width: theme.sizes.avatarMd * 2.5, height: theme.sizes.avatarMd * 2.5, borderRadius: theme.radius.full, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     actions: { flexDirection: 'row', gap: theme.spacing[3] },
-    initial: { ...theme.typography.h1 },
-    name: { ...theme.typography.h2, color: theme.colors.textPrimary, textAlign: 'center' },
     subtitle: { ...theme.typography.bodySm, color: theme.colors.textSecondary },
     friendsButton: { flex: 1, alignItems: 'center', gap: theme.spacing[3], padding: theme.spacing[5], minHeight: theme.sizes.touchTarget, backgroundColor: theme.colors.accentSubtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.borderSubtle },
     settingsButton: { flex: 1, alignItems: 'center', gap: theme.spacing[3], padding: theme.spacing[5], minHeight: theme.sizes.touchTarget, backgroundColor: theme.colors.bgSurface, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.borderSubtle },

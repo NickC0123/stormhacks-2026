@@ -83,7 +83,7 @@ export function EventForm({ event, onBusyChange }: { event?: EventDetail; onBusy
         <Button label="Remove schedule" variant="ghost" size="sm" disabled={busy} onPress={() => { setStart(null); setEnd(null); }} />
       </> : <>
         <Text style={styles.hint}>Schedule it now, or leave the date open.</Text>
-        <Button label="Add date and time" variant="secondary" disabled={busy} onPress={() => {
+        <Button label="Add date and time" variant="outline" shape="pill" disabled={busy} onPress={() => {
           const date = new Date();
           date.setHours(date.getHours() + 1, 0, 0, 0);
           setStart(dateTimeFields(date));
@@ -97,12 +97,12 @@ export function EventForm({ event, onBusyChange }: { event?: EventDetail; onBusy
         <Button label="Manage people" variant="secondary" disabled={busy} onPress={() => router.push({ pathname: '/events/[eventId]/invite', params: { eventId: event.id } })} />
       </> : <>
         <Text style={styles.hint}>{people.length + usernames.length ? `${people.length + usernames.length} selected · ${[...people.map((person) => `@${person.username}`), ...usernames.map((name) => `@${name}`)].join(', ')}` : 'Start with yourself, or bring people along.'}</Text>
-        <Button label={peopleOpen ? 'Done choosing people' : 'Add people'} variant="secondary" disabled={busy} onPress={() => setPeopleOpen(!peopleOpen)} />
+        <Button label={peopleOpen ? 'Done choosing people' : 'Add people'} variant="outline" shape="pill" disabled={busy} onPress={() => setPeopleOpen(!peopleOpen)} />
         {peopleOpen ? <EventPeoplePicker selected={people} onChange={setPeople} usernames={usernames} onUsernamesChange={setUsernames} disabled={busy} /> : null}
       </>}
     </View>
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-    <Button label={event ? 'Save changes' : 'Create event'} loading={busy} disabled={!title.trim()} onPress={() => { void save(); }} />
+    <Button label={event ? 'Save changes' : 'Create event'} variant="primary" shape="pill" loading={busy} disabled={!title.trim()} onPress={() => { void save(); }} />
   </View>;
 }
 

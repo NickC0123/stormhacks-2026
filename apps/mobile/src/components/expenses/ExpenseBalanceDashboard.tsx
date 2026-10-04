@@ -1,4 +1,3 @@
-import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -6,8 +5,8 @@ import { BalanceSectionSkeleton } from '@/components/expenses/ExpenseCardSkeleto
 import { BottomDrawer } from '@/components/ui/BottomDrawer';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { CopyButton } from '@/components/ui/CopyButton';
 import { LoadState } from '@/components/ui/LoadState';
-import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import type { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import {
@@ -377,7 +376,6 @@ function BalanceDetailDrawer({
   styles: Styles;
 }) {
   const theme = useTheme();
-  const { showSnackbar } = useSnackbar();
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const settling = useRef(false);
@@ -483,30 +481,7 @@ function BalanceDetailDrawer({
                 <Text style={[styles.hint, styles.paymentValue]} selectable>
                   {label}: {value}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Copy ${label}`}
-                  hitSlop={theme.spacing[3]}
-                  onPress={() => {
-                    void Clipboard.setStringAsync(value).then(() => {
-                      showSnackbar({
-                        message: 'Copied to clipboard.',
-                        variant: 'success',
-                        overModal: true,
-                      });
-                    });
-                  }}
-                  style={({ pressed }) => [
-                    styles.copyButton,
-                    pressed && styles.copyButtonPressed,
-                  ]}
-                >
-                  <SFSymbolIcon
-                    name="doc.on.doc"
-                    size={theme.sizes.iconMd}
-                    color={theme.colors.textSecondary}
-                  />
-                </Pressable>
+                <CopyButton value={value} label={label} overModal />
               </View>
             );
           })}
@@ -669,15 +644,6 @@ function createStyles(theme: Theme) {
     },
     paymentValue: {
       flex: 1,
-    },
-    copyButton: {
-      padding: theme.spacing[1],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radius.md,
-    },
-    copyButtonPressed: {
-      backgroundColor: theme.colors.bgSurface,
     },
     footerActions: {
       gap: theme.spacing[2],

@@ -3,7 +3,9 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ProfileIdentity } from '@/components/profile/ProfileIdentity';
 import { BackButton } from '@/components/ui/BackButton';
+import { CopyButton } from '@/components/ui/CopyButton';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
@@ -32,17 +34,18 @@ export default function UserScreen() {
     );
   }
 
-  const name = user.username ? `@${user.username}` : 'Profile';
+  const name = user.username ? `@${user.username}` : 'This person';
 
   return (
     <Screen
-      title={name}
+      title="Profile"
       onRefresh={refresh}
       refreshing={refreshing}
       headerLeft={<BackButton />}
       headerRight={<View />}
     >
       <View style={styles.content}>
+        <ProfileIdentity username={user.username} avatarColor={user.avatar_color} />
         <ListGroup
           title="Contact info"
           count={user.contacts.length}
@@ -57,7 +60,10 @@ export default function UserScreen() {
   );
 }
 
-/** A shared contact. Social handles open in their app; e-transfer details can be selected and copied. */
+/**
+ * A shared contact. Social handles and WhatsApp open in their app; e-transfer
+ * details get a copy button on the trailing edge.
+ */
 function ContactRow({ contact }: { contact: Contact }) {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -65,6 +71,7 @@ function ContactRow({ contact }: { contact: Contact }) {
   const meta = CONTACTS[contact.kind];
   const value = formatContact(contact.kind, contact.value);
   const url = meta.url?.(contact.value);
+  const copyable = contact.kind === 'etransfer_email' || contact.kind === 'etransfer_phone';
 
   const text = (
     <View style={styles.text}>
@@ -75,15 +82,7 @@ function ContactRow({ contact }: { contact: Contact }) {
     </View>
   );
 
-  if (!url) {
-    return (
-      <View style={styles.row} accessible accessibilityLabel={`${meta.label}, ${value}`}>
-        {text}
-      </View>
-    );
-  }
-
-  return (
+  const main = url ? (
     <Pressable
       onPress={() => Linking.openURL(url).catch(() => Alert.alert(`Could not open ${meta.label}`))}
       onFocus={() => setFocused(true)}
@@ -91,13 +90,24 @@ function ContactRow({ contact }: { contact: Contact }) {
       accessibilityRole="link"
       accessibilityLabel={`${meta.label}, ${value}`}
       accessibilityHint={`Opens ${meta.label}`}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed, focused && styles.focused]}
+      style={({ pressed }) => [styles.main, pressed && styles.pressed, focused && styles.focused]}
     >
       {text}
       <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
         ›
       </Text>
     </Pressable>
+  ) : (
+    <View style={styles.main} accessible accessibilityLabel={`${meta.label}, ${value}`}>
+      {text}
+    </View>
+  );
+
+  return (
+    <View style={styles.row}>
+      {main}
+      {copyable ? <CopyButton value={contact.value} label={meta.label} /> : null}
+    </View>
   );
 }
 
@@ -108,6 +118,12 @@ function createStyles(theme: Theme) {
       gap: theme.spacing[8],
     },
     row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[2],
+    },
+    main: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing[3],
