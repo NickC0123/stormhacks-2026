@@ -36,9 +36,9 @@ All commands below run from the repo root unless a step says otherwise.
 ./dev up
 ```
 
-The first run downloads Docker images and installs mobile packages, so it may take a few minutes. The script reads local Supabase keys, creates ignored env files, builds the API container, and starts Expo in the background. It starts the Supabase services used by the app (database, auth, storage, REST) and skips optional analytics, Studio, and edge services to save resources. Database migrations apply on the first Supabase start. To reset the database and apply the seed again, run `supabase db reset` (or `npx supabase db reset` if the CLI is not installed).
+The default command connects to hosted Supabase using `apps/mobile/.env.cloud` and `apps/api/.env.cloud`. Configure these ignored files as described below before the first run. It builds the local API container, installs mobile dependencies when needed, and starts Expo in the background.
 
-For receipt scanning, add your Gemini key to `GEMINI_API_KEY` in `apps/api/.env`, then run `./dev up` again. Other features do not need it.
+For receipt scanning, add `GEMINI_API_KEY` to `apps/api/.env.cloud`, then run `./dev up` again.
 
 ## 4. Check the app
 
@@ -53,9 +53,15 @@ curl http://localhost:8000/api/v1/health
 
 Most other endpoints currently return `501 Not Implemented`. That is expected until they are built. The script prints a QR code and an `exp://` URL for Expo Go after the mobile server is ready. Scan it with Expo Go on Android or the Camera app on iOS. Expo startup output is in `.dev/expo.log`.
 
+The app opens on Supabase email/password sign-in. Choose **Create an account** for a new user in the hosted project; email confirmation follows the project’s Auth settings. Sessions persist on the device, and **Profile → Sign out** ends the session. The Events tab can create an event for the signed-in user. Accounts and events created with `./dev up` live in the hosted Supabase project. View accounts under **Authentication → Users** and app data under **Table Editor** in the online dashboard.
+
+### Hosted Supabase project
+
+For hosted development, put the project URL and publishable key in the ignored `apps/mobile/.env.cloud` file, and the matching project URL and legacy `service_role` key in the ignored `apps/api/.env.cloud` file. The current Python client expects the JWT-formatted service-role key; find it under the project's legacy API keys. Set `EXPO_PUBLIC_API_URL` in the mobile file to your computer's LAN address on port 8000. The service-role key belongs only in the API file, never in the mobile app or Git. Apply the migrations in `supabase/migrations/` to the hosted database before creating events. Then run `./dev up` (or `./dev up cloud`); use `./dev down` to stop Expo and the API. Cloud mode does not start, stop, or overwrite local Supabase. For an optional local database, run `./dev up local` and stop it with `./dev down local`.
+
 ### Using a physical phone
 
-The script writes your computer's detected LAN IP into mobile env vars. Make sure the phone and computer are on the same Wi-Fi. If it picks the wrong interface, run `DEV_HOST=192.168.1.20 ./dev up` with your LAN IP.
+Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000. Make sure the phone and computer are on the same Wi-Fi. Update that URL when your LAN IP changes. For local mode, you can override detection with `DEV_HOST=192.168.1.20 ./dev up local`.
 
 Find your LAN IP with `ipconfig getifaddr en0` (macOS), `hostname -I` (Linux), or `ipconfig` (Windows).
 
@@ -65,7 +71,7 @@ Find your LAN IP with `ipconfig getifaddr en0` (macOS), `hostname -I` (Linux), o
 ./dev down
 ```
 
-This stops Expo, the API container, and the Supabase stack. Your data is kept for next time. To wipe it, run `supabase db reset`.
+This stops Expo and the API container. Hosted Supabase keeps running and retains your data.
 
 ## Everyday commands
 
@@ -74,8 +80,8 @@ This stops Expo, the API container, and the Supabase stack. Your data is kept fo
 | Start everything | `./dev up` |
 | Stop everything | `./dev down` |
 | Follow API logs | `docker compose logs -f api` |
-| Reset the database | `supabase db reset` |
-| Show Supabase URLs and keys | `supabase status` |
+| Reset the optional local database | `supabase db reset` |
+| Show optional local Supabase URLs and keys | `supabase status` |
 | Follow Expo logs | `tail -f .dev/expo.log` |
 | Typecheck mobile | `cd apps/mobile && npm run typecheck` |
 | Lint + test API | `cd apps/api && ruff check . && pytest` |
@@ -92,10 +98,10 @@ Docker Desktop is not running. Start it and retry.
 Another process is using the port. Stop it, or run `./dev down` and `supabase stop` to clear leftover containers from a previous run.
 
 **API returns 401 or crashes on startup**
-`SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` is missing or wrong. Re-copy it from `supabase status` and run `./dev up` again.
+`SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env.cloud` is missing or wrong. Copy the hosted project’s legacy service_role key and run `./dev up` again.
 
 **Mobile app cannot reach the API or Supabase on a phone**
-Set `DEV_HOST` to your computer's LAN IP (see step 4) and run `./dev up` again.
+Update `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000 and run `./dev up` again.
 
 **Mobile app shows old environment values**
 Expo caches env vars. Stop it and run `npx expo start --clear`.
@@ -107,7 +113,7 @@ Run `chmod +x dev`.
 Use Git Bash or WSL, not PowerShell or cmd.
 
 **Receipt scanning fails**
-Check that `GEMINI_API_KEY` is set in `apps/api/.env` and that you restarted the API after adding it.
+Check that `GEMINI_API_KEY` is set in `apps/api/.env.cloud` and that you restarted the API after adding it.
 
 ## Project layout
 
