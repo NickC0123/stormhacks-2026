@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,6 +21,17 @@ def signed_in_user():
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user")
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def gemini_configured(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        receipts_route, "get_settings", lambda: SimpleNamespace(gemini_api_key="test-key")
+    )
+
+
+def fail_if_parsed(data: bytes, mime: str):
+    raise AssertionError("parse_receipt should not run")
 
 
 GEMINI_JSON = {
@@ -104,6 +116,35 @@ def test_scan_without_gemini_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(receipts_route, "parse_receipt", not_configured)
     assert scan().status_code == 503
+
+
+def test_scan_rejects_before_reading_when_key_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(receipts_route, "get_settings", lambda: SimpleNamespace(gemini_api_key=""))
+    monkeypatch.setattr(receipts_route, "parse_receipt", fail_if_parsed)
+    assert scan().status_code == 503
+
+
+def test_scan_rejects_oversized_upload_from_declared_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(receipts_route, "parse_receipt", fail_if_parsed)
+    res = client.post(
+        "/api/v1/receipts/scan",
+        content=b"x",
+        headers={"Content-Type": "multipart/form-data; boundary=x", "Content-Length": "999999999"},
+    )
+    assert res.status_code == 413
+
+
+def test_scan_rejects_oversized_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(receipts_route, "parse_receipt", fail_if_parsed)
+    big = JPEG_BYTES + b"\x00" * receipts_route.MAX_IMAGE_BYTES
+    assert scan(data=big).status_code == 413
+
+
+def test_scan_requires_file() -> None:
+    res = client.post("/api/v1/receipts/scan", data={"other": "x"})
+    assert res.status_code == 400
 
 
 def test_scan_requires_token() -> None:

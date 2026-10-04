@@ -48,9 +48,18 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Receipt problems show in the receipt section at the top, next to the photo they are about.
+  const [receiptError, setReceiptError] = useState('');
+  const [scanning, setScanning] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [hasReceipt, setHasReceipt] = useState(false);
-  const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
+  const picker = useReceiptPicker();
+  const { asset, error: photoError } = picker;
+  // A new or removed photo makes the last scan error stale.
+  const freshPhoto = (action: () => void) => () => { setReceiptError(''); action(); };
+  const takePhoto = freshPhoto(picker.takePhoto);
+  const chooseFromLibrary = freshPhoto(picker.chooseFromLibrary);
+  const clear = freshPhoto(picker.clear);
   const totals = expenseTotal(form);
   const printedTotal = receiptTotalMismatch(totals, form.parsed_receipt);
 
@@ -69,7 +78,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             const { url } = await getExpenseReceiptUrl(expenseId);
             if (active) setReceiptUrl(url);
           } catch (err) {
-            if (active) setError(`Expense loaded, but its receipt image could not load: ${messageOf(err)}`);
+            if (active) setReceiptError(`Expense loaded, but its receipt image could not load: ${messageOf(err)}`);
           }
         }
       }).catch((err) => { if (active) setLoadError(messageOf(err)); })
@@ -89,7 +98,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   async function readReceipt() {
     if (!asset || busy) return;
     setBusy(true);
-    setError('');
+    setScanning(true);
+    setReceiptError('');
     try {
       const fields = receiptExpenseFields(await scanReceipt(asset));
       setForm((current) => ({
@@ -99,9 +109,10 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         time: fields.date ? null : current.time,
       }));
     } catch (err) {
-      setError(messageOf(err));
+      setReceiptError(messageOf(err));
     } finally {
       setBusy(false);
+      setScanning(false);
     }
   }
 
@@ -188,6 +199,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           <Action label="Remove selected photo" onPress={clear} disabled={busy} styles={styles} />
           <Text style={styles.hint}>The selected photo will attach when you save. Scanning is optional.</Text>
         </> : null}
+        {scanning ? <View style={styles.scanning}><ActivityIndicator /><Text style={styles.hint}>Reading receipt…</Text></View> : null}
+        {photoError || receiptError ? <Text style={styles.warning} accessibilityRole="alert">{photoError || receiptError}</Text> : null}
         {form.parsed_receipt?.warnings.map((warning, i) => <Text key={i} style={styles.warning}>{warning}</Text>)}
         <Field label="Title" value={form.title} onChangeText={(value) => field('title', value)} styles={styles} editable={!busy} />
         <Field label="Description (optional)" value={form.description ?? ''} onChangeText={(value) => field('description', value || null)} styles={styles} editable={!busy} multiline />
@@ -242,7 +255,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         </Text> : null}
         {!form.items.length ? <Text style={styles.hint}>The total is calculated from the items. Add an item to set it.</Text> : null}
         {error ? <Text style={styles.warning}>{error}</Text> : null}
-        {busy ? <ActivityIndicator /> : null}
+        {busy && !scanning ? <ActivityIndicator /> : null}
         <Action label="Save expense" onPress={save} disabled={busy} styles={styles} primary />
       </ScrollView>
     </SafeAreaView>
@@ -280,6 +293,7 @@ function createStyles(theme: Theme) {
     primaryText: { color: theme.colors.onAccent },
     preview: { width: '100%', height: 220, borderRadius: 10 },
     warning: { color: theme.colors.textPrimary, backgroundColor: theme.colors.accentSubtle, padding: 12, borderRadius: 8 },
+    scanning: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] },
     choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     choice: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.borderSubtle },
     selected: { borderColor: theme.colors.accentStrong, backgroundColor: theme.colors.accentSubtle },

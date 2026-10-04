@@ -1,10 +1,12 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
 from app.core.auth import CurrentUserDep
+from app.core.config import get_settings
 from app.schemas.receipt import ParsedReceipt, Receipt
 from app.schemas.split import SplitRequest
 from app.services.receipt_parser import (
@@ -33,9 +35,29 @@ def detect_image_type(data: bytes) -> str | None:
     return None
 
 
+# Room for the multipart boundary and headers around the image itself.
+MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
+
 @router.post("/receipts/scan", response_model=ParsedReceipt)
-async def scan_receipt(file: UploadFile, user: CurrentUserDep) -> ParsedReceipt:
+async def scan_receipt(request: Request, user: CurrentUserDep) -> ParsedReceipt:
     """Parse a receipt image with Gemini and return items for the user to review."""
+    # Cheap checks first, before the upload is read: nothing is spent on a scan that can't run.
+    if not get_settings().gemini_api_key:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Receipt scanning is not configured. Set GEMINI_API_KEY in "
+            "apps/api/.env.cloud and restart the API.",
+        )
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_IMAGE_BYTES + MULTIPART_OVERHEAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Images must be 10 MB or smaller."
+        )
+
+    file = (await request.form()).get("file")
+    if not isinstance(file, UploadFile):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Attach the receipt image as 'file'.")
     data = await file.read(MAX_IMAGE_BYTES + 1)
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "The uploaded image is empty.")
