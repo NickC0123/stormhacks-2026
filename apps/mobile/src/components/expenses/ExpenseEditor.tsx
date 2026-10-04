@@ -25,7 +25,7 @@ import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
-import { attachExpenseReceipt, categoryLabels, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
+import { attachExpenseReceipt, categoryLabels, deleteExpense, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
 import { useTheme, type Theme } from '@/theme';
 import type { ExpenseItem, ExpenseWrite, ItemCategory } from '@/types';
@@ -516,6 +516,33 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
     }
   }
 
+  function confirmDelete() {
+    if (busy || !savedId) return;
+    Alert.alert(
+      'Delete expense?',
+      'This removes the expense for everyone on it, and balances will update. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void remove(savedId) },
+      ],
+    );
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await deleteExpense(id);
+      router.back();
+      setTimeout(() => {
+        showSnackbar({ message: 'Expense deleted.', variant: 'success' });
+      }, theme.motion.modal.closeDur + theme.motion.duration.fast);
+    } catch (err) {
+      setError(`Could not delete the expense. ${messageOf(err)}`);
+      setBusy(false);
+    }
+  }
+
   if (loading) return <View style={styles.center}><ActivityIndicator /><Text style={styles.text}>Loading expense…</Text></View>;
   if (loadError) return <View style={styles.center}><Text style={styles.text}>{loadError}</Text><Text style={styles.text} onPress={() => router.back()}>Go back</Text></View>;
 
@@ -976,6 +1003,20 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 <Text style={styles.primaryCtaText}>Save expense</Text>
               )}
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete expense"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              onPress={confirmDelete}
+              style={({ pressed }) => [
+                styles.deleteCta,
+                pressed && !busy && styles.outlineCtaPressed,
+                busy && styles.primaryCtaDisabled,
+              ]}
+            >
+              <Text style={styles.deleteCtaText}>Delete expense</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -1089,6 +1130,20 @@ function createStyles(theme: Theme) {
       borderWidth: theme.sizes.borderWidth,
       borderColor: theme.colors.accentStrong,
       backgroundColor: theme.colors.bgSurface,
+    },
+    deleteCta: {
+      height: m.actionHeight,
+      marginTop: theme.spacing[3],
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radius.full,
+    },
+    deleteCtaText: {
+      fontFamily: theme.fonts.sans.medium,
+      fontSize: 17,
+      lineHeight: 22,
+      color: theme.colors.danger,
+      textAlign: 'center',
     },
     outlineCtaPressed: {
       backgroundColor: theme.colors.bgSurfaceAlt,

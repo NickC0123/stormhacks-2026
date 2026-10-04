@@ -48,6 +48,9 @@ export const saveExpense = (body: ExpenseWrite, id?: string) => apiFetch<Expense
   { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) },
 );
 
+/** Creator only. Removes the expense for everyone on it. */
+export const deleteExpense = (id: string) => apiFetch<void>(`/expenses/${id}`, { method: 'DELETE' });
+
 export function attachExpenseReceipt(id: string, asset: ImagePickerAsset) {
   const form = new FormData();
   form.append('file', new File(asset.uri) as unknown as Blob);

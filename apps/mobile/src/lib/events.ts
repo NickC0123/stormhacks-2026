@@ -9,6 +9,11 @@ export function getEvent(eventId: string): Promise<EventDetail> {
   return apiFetch<EventDetail>(`/events/${eventId}`);
 }
 
+/** Host only. Deletes the event with its expenses, photos and payments. */
+export function deleteEvent(eventId: string): Promise<void> {
+  return apiFetch<void>(`/events/${eventId}`, { method: 'DELETE' });
+}
+
 export function inviteToEvent(eventId: string, userId: string): Promise<PersonAdded> {
   return apiFetch<PersonAdded>(`/events/${eventId}/invites`, {
     method: 'POST',

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { EventPhotos } from '@/components/events/EventPhotos';
 import { FriendRow } from '@/components/friends/FriendRow';
@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
+import { useSnackbar } from '@/components/ui/Snackbar';
 import { useFocusedData } from '@/hooks/useFocusedData';
-import { displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
+import { deleteEvent, displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
 import { useProfile } from '@/lib/profile';
 import { useTheme, type Theme } from '@/theme';
 
@@ -23,6 +24,34 @@ export default function EventScreen() {
     loader,
     'Could not load this event.',
   );
+  const { showSnackbar } = useSnackbar();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  function confirmDelete() {
+    if (!event) return;
+    Alert.alert(
+      'Delete event?',
+      `“${event.title}” and all its expenses, photos and recorded payments will be deleted for everyone. This can’t be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void remove() },
+      ],
+    );
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteEvent(eventId);
+      router.back();
+      showSnackbar({ message: 'Event deleted.', variant: 'success' });
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete the event.');
+      setDeleting(false);
+    }
+  }
 
   if (!event) {
     return (
@@ -96,6 +125,13 @@ export default function EventScreen() {
             ))}
           </ListGroup>
         ) : null}
+
+        {event.created_by === profile?.id ? (
+          <View style={styles.danger}>
+            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+            <Button label="Delete event" variant="danger" loading={deleting} onPress={confirmDelete} fullWidth />
+          </View>
+        ) : null}
       </View>
     </Screen>
   );
@@ -111,6 +147,14 @@ function createStyles(theme: Theme) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: theme.spacing[3],
+    },
+    danger: {
+      gap: theme.spacing[2],
+    },
+    error: {
+      fontFamily: theme.fonts.sans.regular,
+      fontSize: 15,
+      color: theme.colors.danger,
     },
   });
 }
