@@ -75,6 +75,9 @@ Expense date and optional time are local calendar values; scans with only a date
 leave time empty. The app calculates the overall amount from the items, minus the
 receipt discount, plus tax and tip from a scanned receipt; it cannot be edited directly.
 If a scanned receipt's printed total differs from that amount, the form shows a mismatch warning.
+Balances and the spending chart show CAD only. The API converts 24 common currencies at
+fixed approximate rates in `apps/api/app/services/exchange_rates.py`; expenses in any other
+currency are left out with a note.
 Parser warnings and original JSON are retained for review.
 
 ### Event and expense people

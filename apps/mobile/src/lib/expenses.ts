@@ -1,9 +1,37 @@
 import { File } from 'expo-file-system';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
-import type { Expense, ExpenseWrite, ParsedReceipt } from '@/types';
+import type { Expense, ExpenseWrite, ItemCategory, ParsedReceipt, SpendingSummary } from '@/types';
 
 import { apiFetch } from './api';
+
+/** Display names in picker order. */
+export const categoryLabels: Record<ItemCategory, string> = {
+  groceries: 'Groceries',
+  food_drinks: 'Food & Drinks',
+  transportation: 'Transportation',
+  shopping: 'Shopping',
+  entertainment: 'Entertainment',
+  housing: 'Housing',
+  bills_utilities: 'Bills & Utilities',
+  subscriptions: 'Subscriptions',
+  health_fitness: 'Health & Fitness',
+  education: 'Education',
+  personal_care: 'Personal Care',
+  work: 'Work',
+  other: 'Other',
+};
+
+export const isItemCategory = (value: string): value is ItemCategory => value in categoryLabels;
+
+export const listSpending = () => apiFetch<SpendingSummary>('/dashboard/spending');
+
+/** Note for amounts that could not be converted to CAD, or null when everything was. */
+export function unconvertedNote(currencies: string[]) {
+  return currencies.length
+    ? `Expenses in ${currencies.join(', ')} are not included because there is no CAD exchange rate for them.`
+    : null;
+}
 
 export type ExpenseEvent = { id: string; title: string };
 export const listExpenseEvents = () => apiFetch<ExpenseEvent[]>('/events');

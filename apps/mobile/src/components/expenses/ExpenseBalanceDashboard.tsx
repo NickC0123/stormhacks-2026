@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadState } from '@/components/ui/LoadState';
 import type { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { displayName } from '@/lib/events';
-import { formatCents, toCents } from '@/lib/expenses';
+import { formatCents, toCents, unconvertedNote } from '@/lib/expenses';
 import { useTheme } from '@/theme';
 
 type Props = { balances: ReturnType<typeof useExpenseBalances> };
@@ -52,7 +52,8 @@ export function ExpenseBalanceDashboard({ balances }: Props) {
           }) : null}
         </View>;
       })}
-      <Text style={text}>Opposite amounts with the same person cancel out within each currency. Balances refresh while this tab is open.</Text>
+      {unconvertedNote(data.unconverted_currencies) ? <Text style={text}>{unconvertedNote(data.unconverted_currencies)}</Text> : null}
+      <Text style={text}>All amounts are in CAD; other currencies are converted at approximate rates. Opposite amounts with the same person cancel out. Balances refresh while this tab is open.</Text>
       <Button label="Refresh balances" variant="ghost" loading={balances.refreshing} onPress={balances.refresh} />
     </> : null}
   </View>;

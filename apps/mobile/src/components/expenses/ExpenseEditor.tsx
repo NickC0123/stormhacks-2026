@@ -25,26 +25,12 @@ import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
-import { attachExpenseReceipt, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
+import { attachExpenseReceipt, categoryLabels, expenseTotal, formatCents, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
 import { useTheme, type Theme } from '@/theme';
 import type { ExpenseItem, ExpenseWrite, ItemCategory } from '@/types';
 
-const categories: { value: ItemCategory; label: string }[] = [
-  { value: 'groceries', label: 'Groceries' },
-  { value: 'food_drinks', label: 'Food & Drinks' },
-  { value: 'transportation', label: 'Transportation' },
-  { value: 'shopping', label: 'Shopping' },
-  { value: 'entertainment', label: 'Entertainment' },
-  { value: 'housing', label: 'Housing' },
-  { value: 'bills_utilities', label: 'Bills & Utilities' },
-  { value: 'subscriptions', label: 'Subscriptions' },
-  { value: 'health_fitness', label: 'Health & Fitness' },
-  { value: 'education', label: 'Education' },
-  { value: 'personal_care', label: 'Personal Care' },
-  { value: 'work', label: 'Work' },
-  { value: 'other', label: 'Other' },
-];
+const categories = (Object.keys(categoryLabels) as ItemCategory[]).map((value) => ({ value, label: categoryLabels[value] }));
 const itemMoneyPattern = /^-?(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const quantityPattern = /^(?:0|[1-9]\d{0,6})(?:\.\d{1,3})?$/;
 const validQuantity = (quantity: ExpenseItem['quantity']) => {

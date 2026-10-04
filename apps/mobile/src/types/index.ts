@@ -228,6 +228,18 @@ export type ExpenseSplit = {
   shares: { user: EventUser; amount: string }[];
 };
 
+/**
+ * Your own share of spending by item category, converted to CAD at fixed approximate rates.
+ * Amounts are "10.00" strings.
+ */
+export type SpendingSummary = {
+  currency: 'CAD';
+  total: string;
+  by_category: { category: string; amount: string }[];
+  /** Expenses in these currencies have no rate and are left out. */
+  unconverted_currencies: string[];
+};
+
 export type BalanceDashboard = {
   totals: { currency: string; you_owe: string; owed_to_you: string }[];
   people: {
@@ -237,4 +249,6 @@ export type BalanceDashboard = {
     owed_to_you: string;
     expenses: { expense_id: string; title: string; amount: string }[];
   }[];
+  /** Amounts are in CAD; expenses in these currencies have no rate and are left out. */
+  unconverted_currencies: string[];
 };
