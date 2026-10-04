@@ -3,9 +3,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { useTheme, type Theme } from '@/theme';
+import type { AvatarColor } from '@/types';
 
 type Props = {
   username: string;
+  /** iOS system accent for their initials avatar. */
+  avatarColor?: AvatarColor | null;
   subtitle?: string;
   /** Buttons shown on the trailing edge; wraps below the name on narrow screens. */
   actions?: ReactNode;
@@ -13,14 +16,14 @@ type Props = {
   onPress?: () => void;
 };
 
-export function FriendRow({ username, subtitle, actions, onPress }: Props) {
+export function FriendRow({ username, avatarColor, subtitle, actions, onPress }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
   const [focused, setFocused] = useState(false);
   const label = subtitle ? `@${username}, ${subtitle}` : `@${username}`;
   const identity = (
     <>
-      <Avatar name={username} />
+      <Avatar name={username} color={avatarColor} />
       <View style={styles.text}>
         <Text style={styles.username} numberOfLines={1}>
           @{username}

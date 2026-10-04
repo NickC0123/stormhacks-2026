@@ -41,7 +41,11 @@ export const settleUp = (userId: string, amount: string) => apiFetch<BalanceDash
 
 export type ExpenseEvent = { id: string; title: string };
 export const listExpenseEvents = () => apiFetch<ExpenseEvent[]>('/events');
-export const listExpenses = (offset = 0) => apiFetch<Expense[]>(`/expenses?offset=${offset}`);
+export function listExpenses(offset = 0, eventId?: string) {
+  const params = new URLSearchParams({ offset: String(offset) });
+  if (eventId) params.set('event_id', eventId);
+  return apiFetch<Expense[]>(`/expenses?${params}`);
+}
 export const getExpense = (id: string) => apiFetch<Expense>(`/expenses/${id}`);
 export const saveExpense = (body: ExpenseWrite, id?: string) => apiFetch<Expense>(
   id ? `/expenses/${id}` : '/expenses',

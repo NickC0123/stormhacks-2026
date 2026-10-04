@@ -1,9 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useState } from 'react';
-import { Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
-import { ListGroup } from '@/components/ui/ListGroup';
 import { LoadState } from '@/components/ui/LoadState';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useFocusedData } from '@/hooks/useFocusedData';
@@ -26,22 +25,30 @@ type Props = {
   hostId: string;
   /** The signed-in user; they can delete their own photos, and the host can delete any. */
   userId?: string;
+  /** Increment to open the library picker from outside (e.g. event header +). */
+  pickRequest?: number;
 };
 
-/** Photo grid for an event, with a button to add photos from the library. */
-export function EventPhotos({ eventId, hostId, userId }: Props) {
+/** Photo grid for an event. */
+export function EventPhotos({ eventId, hostId, userId, pickRequest = 0 }: Props) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
   const loader = useCallback(() => listEventPhotos(eventId), [eventId]);
-  const { data: photos, loading, error, reload, retry, busyIds, run } = useFocusedData(loader, 'Could not load photos.');
-  const [uploading, setUploading] = useState(false);
+  const { data: photos, loading, error, busyIds, run, reload, retry } = useFocusedData(
+    loader,
+    'Could not load photos.',
+  );
   const [gridWidth, setGridWidth] = useState(0);
   const [viewing, setViewing] = useState<EventPhoto | null>(null);
+  const lastPickRequest = useRef(0);
 
-  async function addPhotos() {
+  const canDelete = (photo: EventPhoto) =>
+    userId !== undefined && (userId === photo.author_id || userId === hostId);
+
+  const addPhotos = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
     if (result.canceled) return;
-    setUploading(true);
     let failed = 0;
     let lastError = '';
     for (const asset of result.assets) {
@@ -53,70 +60,99 @@ export function EventPhotos({ eventId, hostId, userId }: Props) {
       }
     }
     await reload();
-    setUploading(false);
     if (failed) {
       const what = failed === result.assets.length ? 'Your photos' : `${failed} of ${result.assets.length} photos`;
       Alert.alert(`${what} could not be added`, lastError);
     }
-  }
+  }, [eventId, reload]);
 
-  const canDelete = (photo: EventPhoto) => userId !== undefined && (userId === photo.author_id || userId === hostId);
+  useEffect(() => {
+    if (pickRequest > 0 && pickRequest !== lastPickRequest.current) {
+      lastPickRequest.current = pickRequest;
+      void addPhotos();
+    }
+  }, [pickRequest, addPhotos]);
 
   function confirmDelete(photo: EventPhoto) {
-    Alert.alert('Delete photo?', 'It will be removed from the event for everyone.', [
+    if (!canDelete(photo)) return;
+    Alert.alert('Delete photo?', 'This removes it from the event for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => void run(photo.id, () => deleteEventPhoto(eventId, photo.id), 'Could not delete photo'),
+        onPress: () => {
+          const id = photo.id;
+          setViewing(null);
+          run(id, () => deleteEventPhoto(eventId, id), 'Could not delete photo');
+        },
       },
     ]);
   }
 
   const gap = theme.spacing[1];
   const tileSize = gridWidth ? (gridWidth - gap * (COLUMNS - 1)) / COLUMNS : 0;
+  const deleting = viewing ? busyIds.has(viewing.id) : false;
+  const viewingDeletable = viewing ? canDelete(viewing) : false;
 
   return (
     <View style={styles.section}>
-      <ListGroup title="Photos" count={photos?.length} emptyText="No photos yet. Add the first one.">
-        {photos ? (
-          <View style={[styles.grid, { gap }]} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
-            {tileSize > 0 &&
-              photos.map((photo) => (
-                <View key={photo.id} style={busyIds.has(photo.id) && styles.busy}>
-                  <Pressable
-                    onPress={() => setViewing(photo)}
-                    accessibilityRole="imagebutton"
-                    accessibilityLabel="Open photo"
-                  >
-                    <Image source={{ uri: photo.url }} style={[styles.tile, { width: tileSize, height: tileSize }]} />
-                  </Pressable>
-                  {canDelete(photo) ? (
-                    <Pressable
-                      onPress={() => confirmDelete(photo)}
-                      disabled={busyIds.has(photo.id)}
-                      hitSlop={theme.spacing[2]}
-                      accessibilityRole="button"
-                      accessibilityLabel="Delete photo"
-                      style={({ pressed }) => [styles.remove, pressed && styles.removePressed]}
-                    >
-                      <SFSymbolIcon name="xmark" size={12} color="#fff" />
-                    </Pressable>
-                  ) : null}
-                </View>
-              ))}
-          </View>
-        ) : (
-          <LoadState loading={loading} error={error} fallbackError="Could not load photos." onRetry={retry} />
-        )}
-      </ListGroup>
-
-      <Button label="Add photos" variant="secondary" loading={uploading} onPress={addPhotos} />
+      {!photos ? (
+        <LoadState loading={loading} error={error} fallbackError="Could not load photos." onRetry={retry} />
+      ) : photos.length === 0 ? (
+        <Text style={styles.empty}>No photos yet.</Text>
+      ) : (
+        <View style={[styles.grid, { gap }]} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
+          {tileSize > 0 &&
+            photos.map((photo) => (
+              <Pressable
+                key={photo.id}
+                onPress={() => setViewing(photo)}
+                onLongPress={canDelete(photo) ? () => confirmDelete(photo) : undefined}
+                disabled={busyIds.has(photo.id)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Open photo"
+                accessibilityHint={canDelete(photo) ? 'Long press to delete' : undefined}
+                style={({ pressed }) => [
+                  busyIds.has(photo.id) && styles.tileBusy,
+                  pressed && styles.tilePressed,
+                ]}
+              >
+                <Image source={{ uri: photo.url }} style={[styles.tile, { width: tileSize, height: tileSize }]} />
+              </Pressable>
+            ))}
+        </View>
+      )}
 
       <Modal visible={viewing !== null} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
-        <Pressable style={styles.viewer} onPress={() => setViewing(null)} accessibilityLabel="Close photo">
-          {viewing ? <Image source={{ uri: viewing.url }} style={styles.full} resizeMode="contain" /> : null}
-        </Pressable>
+        <View style={styles.viewer}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setViewing(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+          />
+          {viewing ? (
+            <Image source={{ uri: viewing.url }} style={styles.full} resizeMode="contain" pointerEvents="none" />
+          ) : null}
+          {viewingDeletable ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete photo"
+              accessibilityState={{ disabled: deleting }}
+              disabled={deleting}
+              hitSlop={theme.spacing[2]}
+              onPress={() => viewing && confirmDelete(viewing)}
+              style={({ pressed }) => [
+                styles.deleteButton,
+                { top: insets.top + theme.spacing[3], right: theme.sizes.pagePaddingX },
+                pressed && !deleting && styles.deleteButtonPressed,
+                deleting && styles.deleteButtonDisabled,
+              ]}
+            >
+              <SFSymbolIcon name="trash" size={theme.sizes.iconMd} color={theme.colors.onDanger} />
+            </Pressable>
+          ) : null}
+        </View>
       </Modal>
     </View>
   );
@@ -125,7 +161,11 @@ export function EventPhotos({ eventId, hostId, userId }: Props) {
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     section: {
-      gap: theme.spacing[3],
+      gap: theme.spacing[4],
+    },
+    empty: {
+      ...theme.typography.bodySm,
+      color: theme.colors.textSecondary,
     },
     grid: {
       flexDirection: 'row',
@@ -135,31 +175,36 @@ function createStyles(theme: Theme) {
       borderRadius: theme.radius.md,
       backgroundColor: theme.colors.bgSurfaceAlt,
     },
-    busy: {
+    tilePressed: {
+      opacity: 0.85,
+    },
+    tileBusy: {
       opacity: theme.opacity.disabled,
-    },
-    remove: {
-      position: 'absolute',
-      top: theme.spacing[1],
-      right: theme.spacing[1],
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    },
-    removePressed: {
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
     },
     viewer: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+      backgroundColor: theme.colors.photoViewer,
       justifyContent: 'center',
     },
     full: {
       width: '100%',
       height: '100%',
+    },
+    deleteButton: {
+      position: 'absolute',
+      width: theme.sizes.touchTarget,
+      height: theme.sizes.touchTarget,
+      borderRadius: theme.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.danger,
+      ...theme.shadows.fab,
+    },
+    deleteButtonPressed: {
+      backgroundColor: theme.colors.dangerActive,
+    },
+    deleteButtonDisabled: {
+      opacity: theme.opacity.disabled,
     },
   });
 }

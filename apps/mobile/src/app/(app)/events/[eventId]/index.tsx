@@ -1,33 +1,57 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { EventActionModal } from '@/components/events/EventActionModal';
+import { EventExpenses } from '@/components/events/EventExpenses';
 import { EventPhotos } from '@/components/events/EventPhotos';
-import { FriendRow } from '@/components/friends/FriendRow';
-import { Button } from '@/components/ui/Button';
-import { ListGroup } from '@/components/ui/ListGroup';
+import { AvatarStack } from '@/components/ui/AvatarStack';
+import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { LoadState } from '@/components/ui/LoadState';
 import { Screen } from '@/components/ui/Screen';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useSnackbar } from '@/components/ui/Snackbar';
+import { Tabs } from '@/components/ui/Tabs';
 import { useFocusedData } from '@/hooks/useFocusedData';
-import { deleteEvent, displayName, formatEventDate, getEvent, removeInvite } from '@/lib/events';
+import { deleteEvent, formatEventDate, getEvent } from '@/lib/events';
 import { useProfile } from '@/lib/profile';
 import { useTheme, type Theme } from '@/theme';
+
+type EventTab = 'photos' | 'expenses';
+
+const EVENT_TABS: { value: EventTab; label: string }[] = [
+  { value: 'photos', label: 'Photos' },
+  { value: 'expenses', label: 'Expenses' },
+];
+
+function EventBackButton() {
+  return (
+    <CircleIconButton accessibilityLabel="Back" onPress={() => router.back()}>
+      <SFSymbolIcon name="chevron.left" />
+    </CircleIconButton>
+  );
+}
+
+function openManagePeople(eventId: string) {
+  router.push({ pathname: '/events/[eventId]/invite', params: { eventId } });
+}
 
 export default function EventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const { profile } = useProfile();
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { showSnackbar } = useSnackbar();
+  const [tab, setTab] = useState<EventTab>('photos');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [photoPickRequest, setPhotoPickRequest] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const loader = useCallback(() => getEvent(eventId), [eventId]);
-  const { data: event, loading, refreshing, error, busyIds, run, refresh, retry } = useFocusedData(
+  const { data: event, loading, refreshing, error, refresh, retry } = useFocusedData(
     loader,
     'Could not load this event.',
   );
-  const { showSnackbar } = useSnackbar();
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
 
   function confirmDelete() {
     if (!event) return;
@@ -56,7 +80,7 @@ export default function EventScreen() {
 
   if (!event) {
     return (
-      <Screen title="Event" withHeader>
+      <Screen title="Event" headerLeft={<EventBackButton />}>
         <View style={styles.content}>
           <LoadState loading={loading} error={error} fallbackError="Could not load this event." onRetry={retry} />
         </View>
@@ -65,109 +89,107 @@ export default function EventScreen() {
   }
 
   const date = formatEventDate(event.starts_at ?? event.created_at);
-  const description = [date, event.description].filter(Boolean).join(' · ');
+  const isHost = event.created_by === profile?.id;
+
+  const headerRight = (
+    <View style={styles.headerActions}>
+      {isHost ? (
+        <CircleIconButton
+          accessibilityLabel="Delete event"
+          onPress={confirmDelete}
+          disabled={deleting}
+        >
+          <SFSymbolIcon name="trash" color={theme.colors.danger} />
+        </CircleIconButton>
+      ) : null}
+      <CircleIconButton accessibilityLabel="Add to event" onPress={() => setCreateOpen(true)}>
+        <SFSymbolIcon name="plus" />
+      </CircleIconButton>
+    </View>
+  );
 
   return (
-    <Screen title={event.title} description={description} onRefresh={refresh} refreshing={refreshing} withHeader>
-      {event.created_by === profile?.id ? (
-        <Stack.Screen
-          options={{
-            headerRight: () => (
-              <Pressable
-                onPress={confirmDelete}
-                disabled={deleting}
-                hitSlop={theme.spacing[2]}
-                accessibilityRole="button"
-                accessibilityLabel="Delete event"
-                style={({ pressed }) => (pressed || deleting) && styles.pressed}
-              >
-                <SFSymbolIcon name="trash" size={22} color={theme.colors.danger} />
-              </Pressable>
-            ),
-          }}
-        />
-      ) : null}
-      <View style={styles.content}>
-        {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
-        <View style={styles.actions}>
-          <Button
-            label="Manage people"
-            onPress={() => router.push({ pathname: '/events/[eventId]/invite', params: { eventId } })}
+    <>
+      <Screen
+        title={event.title}
+        description={date || undefined}
+        detail={event.description?.trim() || undefined}
+        onRefresh={refresh}
+        refreshing={refreshing}
+        headerLeft={<EventBackButton />}
+        headerRight={headerRight}
+      >
+        <View style={styles.content}>
+          {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+          <AvatarStack
+            people={event.members.map((member) => ({
+              id: member.id,
+              name: member.username ?? '?',
+              color: member.avatar_color,
+            }))}
+            onPress={() => openManagePeople(eventId)}
+            accessibilityLabel="Manage people"
           />
-          <Button
-            label="Add receipt"
-            variant="secondary"
-            onPress={() => router.push({ pathname: '/events/[eventId]/receipts/scan', params: { eventId } })}
-          />
+
+          <View style={styles.tabSection}>
+            <Tabs
+              tabs={EVENT_TABS}
+              value={tab}
+              onChange={setTab}
+              accessibilityLabel="Event sections"
+            />
+            <View style={styles.tabPanel}>
+              <View style={tab === 'photos' ? undefined : styles.hidden}>
+                <EventPhotos
+                  eventId={eventId}
+                  hostId={event.created_by}
+                  userId={profile?.id}
+                  pickRequest={photoPickRequest}
+                />
+              </View>
+              {tab === 'expenses' ? <EventExpenses eventId={eventId} /> : null}
+            </View>
+          </View>
         </View>
+      </Screen>
 
-        <EventPhotos eventId={eventId} hostId={event.created_by} userId={profile?.id} />
-
-        <ListGroup title="Members" count={event.members.length}>
-          {event.members.map((member) => {
-            const roles = [
-              member.id === event.created_by ? 'Host' : null,
-              member.id === profile?.id ? 'You' : null,
-            ].filter(Boolean);
-            return (
-              <FriendRow
-                key={member.id}
-                username={member.username ?? 'unknown'}
-                subtitle={roles.length ? roles.join(' · ') : undefined}
-                onPress={
-                  member.id === profile?.id
-                    ? undefined
-                    : () => router.push({ pathname: '/users/[userId]', params: { userId: member.id } })
-                }
-              />
-            );
-          })}
-        </ListGroup>
-
-        {event.invites.length > 0 ? (
-          <ListGroup title="Invited" count={event.invites.length}>
-            {event.invites.map((invite) => (
-              <FriendRow
-                key={invite.id}
-                username={invite.user.username ?? 'unknown'}
-                subtitle={`Invited by ${invite.invited_by.id === profile?.id ? 'you' : displayName(invite.invited_by)}`}
-                actions={
-                  <Button
-                    label="Cancel"
-                    size="sm"
-                    variant="ghost"
-                    loading={busyIds.has(invite.id)}
-                    onPress={() => run(invite.id, () => removeInvite(invite.id), 'Could not cancel invite')}
-                    accessibilityLabel={`Cancel invite for ${displayName(invite.user)}`}
-                  />
-                }
-              />
-            ))}
-          </ListGroup>
-        ) : null}
-
-      </View>
-    </Screen>
+      <EventActionModal
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onAddPhoto={() => {
+          setTab('photos');
+          setPhotoPickRequest((n) => n + 1);
+        }}
+        onAddExpense={() =>
+          router.push({ pathname: '/expenses/new', params: { eventId } })
+        }
+      />
+    </>
   );
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
     content: {
-      marginTop: theme.spacing[6],
+      marginTop: theme.spacing[3],
       gap: theme.spacing[8],
     },
-    actions: {
+    headerActions: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing[3],
+      alignItems: 'center',
+      gap: theme.spacing[2],
     },
-    pressed: {
-      opacity: theme.opacity.disabled,
+    tabSection: {
+      gap: theme.spacing[4],
+    },
+    tabPanel: {
+      minHeight: theme.spacing[16],
+    },
+    hidden: {
+      display: 'none',
     },
     error: {
-      fontFamily: theme.fonts.sans.regular,
-      fontSize: 15,
+      ...theme.typography.bodySm,
       color: theme.colors.danger,
     },
   });

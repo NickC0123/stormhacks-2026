@@ -1,13 +1,16 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { ExpenseBalanceDashboard } from '@/components/expenses/ExpenseBalanceDashboard';
-import { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { ExpenseInvitations } from '@/components/expenses/ExpenseInvitations';
+import { ExpenseListSkeleton } from '@/components/expenses/ExpenseListSkeleton';
 import { SpendingByCategory } from '@/components/expenses/SpendingByCategory';
-import { useSpending } from '@/hooks/useSpending';
+import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { Screen } from '@/components/ui/Screen';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
+import { useExpenseBalances } from '@/hooks/useExpenseBalances';
+import { useSpending } from '@/hooks/useSpending';
 import { listExpenses } from '@/lib/expenses';
 import { useTheme } from '@/theme';
 import type { Expense } from '@/types';
@@ -50,15 +53,29 @@ export default function ExpensesScreen() {
     }).catch((err) => setError(err instanceof Error ? err.message : 'Could not load expenses.'))]);
   }
 
-  return <Screen title="Expenses" description="Your balances and shared expenses." onRefresh={refresh} refreshing={balances.refreshing}>
+  return (
+    <Screen
+      title="Expenses"
+      titleVariant="page"
+      titleColor="accent"
+      titleAlign="center"
+      onRefresh={refresh}
+      refreshing={balances.refreshing}
+      headerLeft={<View />}
+      headerRight={
+        <CircleIconButton
+          accessibilityLabel="Add expense"
+          onPress={() => router.push('/expenses/new')}
+        >
+          <SFSymbolIcon name="plus" />
+        </CircleIconButton>
+      }
+    >
     <View style={{ gap: 12, marginTop: 20 }}>
-      <Pressable accessibilityRole="button" onPress={() => router.push('/expenses/new')} style={{ padding: 14, borderRadius: 10, backgroundColor: theme.colors.accent }}>
-        <Text style={{ ...theme.typography.body, color: theme.colors.onAccent }}>New expense</Text>
-      </Pressable>
       <SpendingByCategory spending={spending} />
       <ExpenseBalanceDashboard balances={balances} />
       <ExpenseInvitations />
-      {loading ? <ActivityIndicator /> : null}
+      {loading && expenses.length === 0 ? <ExpenseListSkeleton lines={3} /> : null}
       {error ? <Text style={{ color: theme.colors.textPrimary }}>{error}</Text> : null}
       {!loading && !error && expenses.length === 0 ? <Text style={{ color: theme.colors.textSecondary }}>No expenses yet.</Text> : null}
       {expenses.map((expense) => <Pressable key={expense.id} accessibilityRole="button" onPress={() => router.push({ pathname: '/expenses/[expenseId]', params: { expenseId: expense.id } })}
@@ -69,5 +86,6 @@ export default function ExpensesScreen() {
       </Pressable>)}
       {hasMore ? <Pressable disabled={loadingMore} onPress={more} accessibilityRole="button"><Text style={{ color: theme.colors.accentStrong }}>{loadingMore ? 'Loading…' : 'Load more'}</Text></Pressable> : null}
     </View>
-  </Screen>;
+  </Screen>
+  );
 }

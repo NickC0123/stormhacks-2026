@@ -22,12 +22,22 @@ export default function ProfileScreen() {
     if (error) Alert.alert('Could not sign out', error.message);
   }
 
+  const name = profile?.display_name?.trim() || profile?.username || 'Profile';
+  const signedInAs = session?.user.email
+    ? `Signed in as ${session.user.email}`
+    : undefined;
+
   return (
     <Screen
-      title="Profile"
-      description={profile?.username ? `@${profile.username}` : undefined}
+      title={name}
+      titleVariant="page"
+      titleColor="accent"
+      titleAlign="center"
+      description={signedInAs}
       onRefresh={friends.refresh}
       refreshing={friends.refreshing}
+      headerLeft={<View />}
+      headerRight={<View />}
     >
       <View style={styles.content}>
         <FriendsSection friends={friends} />
@@ -35,9 +45,6 @@ export default function ProfileScreen() {
         <ContactsSection />
 
         <View style={styles.account}>
-          {session?.user.email ? (
-            <Text style={styles.signedInAs}>Signed in as {session.user.email}</Text>
-          ) : null}
           <Button label="Sign out" variant="secondary" onPress={signOut} />
         </View>
       </View>
@@ -54,10 +61,6 @@ function createStyles(theme: Theme) {
     account: {
       alignItems: 'flex-start',
       gap: theme.spacing[3],
-    },
-    signedInAs: {
-      ...theme.typography.bodySm,
-      color: theme.colors.textSecondary,
     },
   });
 }

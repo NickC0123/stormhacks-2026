@@ -4,10 +4,13 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.core.avatar_color import AvatarColor
+
 
 class FriendUser(BaseModel):
     id: UUID
     username: str
+    avatar_color: AvatarColor
 
 
 class Friendship(BaseModel):

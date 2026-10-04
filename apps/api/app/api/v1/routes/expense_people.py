@@ -80,9 +80,7 @@ def add_expense_person(
         if user.id != expense["created_by"]:
             raise HTTPException(403, "Only the payer can include themselves in the split.")
         repo.add_member(expense["id"], user.id)
-        return PersonAdded(
-            status="added", user=EventUser(id=user.id, username=target.get("username"))
-        )
+        return PersonAdded(status="added", user=EventUser.from_profile(target))
     return add_person(expense["id"], body, user.id, repo, friends)
 
 

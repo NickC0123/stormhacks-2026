@@ -67,11 +67,42 @@ export type ParsedReceipt = {
   warnings: string[];
 };
 
+/** iOS system accent name stored on the profile for initials avatars. */
+export type AvatarColor =
+  | 'blue'
+  | 'purple'
+  | 'pink'
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'mint'
+  | 'teal'
+  | 'cyan'
+  | 'indigo'
+  | 'brown';
+
+export const AVATAR_COLORS: readonly AvatarColor[] = [
+  'blue',
+  'purple',
+  'pink',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'mint',
+  'teal',
+  'cyan',
+  'indigo',
+  'brown',
+] as const;
+
 /** Keys match the API JSON exactly. `username` is null until the user picks one. */
 export type Profile = {
   id: UUID;
   username: string | null;
   display_name: string;
+  avatar_color: AvatarColor;
 };
 
 export type ContactKind = 'instagram' | 'facebook' | 'whatsapp' | 'etransfer_email' | 'etransfer_phone';
@@ -92,12 +123,14 @@ export type Contact = {
 export type PublicProfile = {
   id: UUID;
   username: string | null;
+  avatar_color: AvatarColor;
   contacts: Contact[];
 };
 
 export type FriendUser = {
   id: UUID;
   username: string;
+  avatar_color: AvatarColor;
 };
 
 /** A friend or pending request, seen from the signed-in user's side. */
@@ -119,6 +152,7 @@ export type FriendsOverview = {
 export type EventUser = {
   id: UUID;
   username: string | null;
+  avatar_color: AvatarColor;
 };
 
 export type EventSummary = {

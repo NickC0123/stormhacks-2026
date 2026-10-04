@@ -60,16 +60,24 @@ function AppNavigator() {
         />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="users/[userId]" options={{ headerShown: true, title: 'Profile', headerBackTitle: 'Back' }} />
-        <Stack.Screen name="events/[eventId]/index" options={{ headerShown: true, title: 'Event', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="events/[eventId]/index" options={{ headerShown: false }} />
         <Stack.Screen
           name="events/[eventId]/invite"
-          options={{ presentation: 'modal', headerShown: true, title: 'Manage people' }}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgSurface },
+          }}
         />
         <Stack.Screen name="events/[eventId]/memories" />
         <Stack.Screen name="events/[eventId]/receipts/[receiptId]" />
         <Stack.Screen
           name="events/[eventId]/receipts/scan"
-          options={{ headerShown: true, title: 'Add receipt', headerBackTitle: 'Back' }}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgSurface },
+          }}
         />
       </Stack.Protected>
       <Stack.Protected guard={!hasUsername}>

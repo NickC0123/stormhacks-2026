@@ -13,6 +13,7 @@ export function ExpenseInvitations() {
   if (!data?.length) return null;
   return <ListGroup title="Expense invitations" count={data.length}>
     {data.map((invite) => <FriendRow key={invite.id} username={invite.invited_by.username ?? 'unknown'}
+      avatarColor={invite.invited_by.avatar_color}
       subtitle={`Invited you to ${invite.expense.title}`} actions={<>
         <Button label="Join" size="sm" loading={busyIds.has(invite.id)} accessibilityLabel={`Join ${invite.expense.title}`}
           onPress={() => run(invite.id, async () => {

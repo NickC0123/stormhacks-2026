@@ -1,7 +1,7 @@
 import type { TextStyle, ViewStyle } from 'react-native';
 
 import { fonts } from '@/theme/fonts';
-import type { ItemCategory } from '@/types';
+import type { AvatarColor, ItemCategory } from '@/types';
 
 /** Primitive color ramps. Components must not consume these directly. */
 export const primitives = {
@@ -58,8 +58,39 @@ export const primitives = {
   stone400: '#a8a29e',
   iosGray6: '#f2f2f7',
   iosGray6Dark: '#1c1c1e',
+  /** iOS system accents (light). */
+  iosBlue: '#007AFF',
+  iosPurple: '#AF52DE',
+  iosPink: '#FF2D55',
+  iosRed: '#FF3B30',
+  iosOrange: '#FF9500',
+  iosYellow: '#FFCC00',
+  iosGreen: '#34C759',
+  iosMint: '#00C7BE',
+  iosTeal: '#30B0C7',
+  iosCyan: '#32ADE6',
+  iosIndigo: '#5856D6',
+  iosBrown: '#A2845E',
+  /** iOS system accents (dark). */
+  iosBlueDark: '#0A84FF',
+  iosPurpleDark: '#BF5AF2',
+  iosPinkDark: '#FF375F',
+  iosRedDark: '#FF453A',
+  iosOrangeDark: '#FF9F0A',
+  iosYellowDark: '#FFD60A',
+  iosGreenDark: '#30D158',
+  iosMintDark: '#63E6BE',
+  iosTealDark: '#40C8E0',
+  iosCyanDark: '#64D2FF',
+  iosIndigoDark: '#5E5CE6',
+  iosBrownDark: '#AC8E68',
   glyphPrimary: '#595959',
 } as const;
+
+export type AvatarAccent = {
+  bg: string;
+  fg: string;
+};
 
 export type ColorScheme = 'light' | 'dark';
 
@@ -99,8 +130,14 @@ export type ThemeColors = {
   /** Success snackbar surface + label/icon (Figma). */
   successSubtle: string;
   success: string;
+  /** Dimmed backdrop behind modals / sheets. */
+  overlay: string;
+  /** Full-screen photo lightbox background (always near-black). */
+  photoViewer: string;
   /** Spending chart segment per expense category. Always pair with a text label. */
   chartCategory: Record<ItemCategory, string>;
+  /** Per-user initials avatar fills keyed by iOS system accent name. */
+  avatarAccent: Record<AvatarColor, AvatarAccent>;
 };
 
 function chartCategoryColors(scheme: ColorScheme): Record<ItemCategory, string> {
@@ -119,6 +156,27 @@ function chartCategoryColors(scheme: ColorScheme): Record<ItemCategory, string> 
     personal_care: dark ? primitives.fuchsia400 : primitives.fuchsia600,
     work: dark ? primitives.gray400 : primitives.gray600,
     other: dark ? primitives.stone400 : primitives.stone500,
+  };
+}
+
+/** Initials on iOS system fills — white, except yellow which needs dark label. */
+function avatarAccentColors(scheme: ColorScheme): Record<AvatarColor, AvatarAccent> {
+  const dark = scheme === 'dark';
+  const onFill = primitives.gray0;
+  const onYellow = dark ? primitives.gray950 : primitives.gray900;
+  return {
+    blue: { bg: dark ? primitives.iosBlueDark : primitives.iosBlue, fg: onFill },
+    purple: { bg: dark ? primitives.iosPurpleDark : primitives.iosPurple, fg: onFill },
+    pink: { bg: dark ? primitives.iosPinkDark : primitives.iosPink, fg: onFill },
+    red: { bg: dark ? primitives.iosRedDark : primitives.iosRed, fg: onFill },
+    orange: { bg: dark ? primitives.iosOrangeDark : primitives.iosOrange, fg: onFill },
+    yellow: { bg: dark ? primitives.iosYellowDark : primitives.iosYellow, fg: onYellow },
+    green: { bg: dark ? primitives.iosGreenDark : primitives.iosGreen, fg: onFill },
+    mint: { bg: dark ? primitives.iosMintDark : primitives.iosMint, fg: onFill },
+    teal: { bg: dark ? primitives.iosTealDark : primitives.iosTeal, fg: onFill },
+    cyan: { bg: dark ? primitives.iosCyanDark : primitives.iosCyan, fg: onFill },
+    indigo: { bg: dark ? primitives.iosIndigoDark : primitives.iosIndigo, fg: onFill },
+    brown: { bg: dark ? primitives.iosBrownDark : primitives.iosBrown, fg: onFill },
   };
 }
 
@@ -155,7 +213,11 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       navItemInactive: primitives.gray400,
       successSubtle: primitives.emerald900,
       success: primitives.emerald300,
+      // Figma Miscellaneous/Alert - Overlay, darkened for night.
+      overlay: 'rgba(0, 0, 0, 0.45)',
+      photoViewer: primitives.gray950,
       chartCategory: chartCategoryColors(scheme),
+      avatarAccent: avatarAccentColors(scheme),
     };
   }
 
@@ -190,7 +252,11 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     navItemInactive: primitives.glyphPrimary,
     successSubtle: primitives.emerald100,
     success: primitives.emerald700,
+    // Figma Miscellaneous/Alert - Overlay ≈ #29293a @ 23%
+    overlay: 'rgba(41, 41, 58, 0.23)',
+    photoViewer: primitives.gray950,
     chartCategory: chartCategoryColors(scheme),
+    avatarAccent: avatarAccentColors(scheme),
   };
 }
 
@@ -288,6 +354,13 @@ export const typography = {
     fontSize: 12,
     lineHeight: 16,
   } satisfies TextStyle,
+  /** Overflow count on avatar stacks (Figma event members +N). */
+  captionStrong: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.24,
+  } satisfies TextStyle,
 } as const;
 
 export type ShadowToken = Pick<
@@ -338,7 +411,15 @@ export const sizes = {
   controlMd: 40,
   controlLg: 48,
   avatarMd: 40,
+  /** Overlapping member stack on event detail (Figma 38:280, enlarged for touch). */
+  avatarStack: 48,
+  avatarStackOverlap: 12,
+  avatarStackRing: 3,
+  /** Max faces before the +N overflow chip. */
+  avatarStackMax: 3,
   borderWidth: 1,
+  /** Underline thickness for selected in-content tabs (design-spec 6.10). */
+  tabIndicator: 2,
   /** Circular icon buttons (header + search) — Figma Large Bordered Prominent = 50. */
   fab: 50,
   /** Plus / search mark size / stroke weight inside circle buttons. */
@@ -369,6 +450,10 @@ export const sizes = {
   receiptDropzonePreview: 340,
   /** Upload glyph inside the receipt dropzone. */
   dropzoneIcon: 38,
+  /** Max width for empty-state receipt caption copy. */
+  dropzoneCaptionMax: 240,
+  /** Hug-content “Add Receipt” CTA on the empty items state. */
+  dropzoneAddReceiptMin: 168,
   /** Select / dropdown menu — ~4 options tall so the list scrolls. */
   dropdownMaxHeight: 176,
   dropdownMinWidth: 192,
@@ -378,6 +463,9 @@ export const opacity = {
   disabled: 0.5,
   /** Peak opacity for the Events bottom content fade. */
   bottomFade: 0.55,
+  /** Skeleton shimmer opacity range (spec §6.17). */
+  skeletonMin: 0.45,
+  skeletonMax: 1,
 } as const;
 
 /** Motion tokens (matches design-spec `--duration-*` / transitions.dev). */
@@ -387,6 +475,8 @@ export const motion = {
     fast: 150,
     normal: 250,
     slow: 400,
+    /** One-way skeleton shimmer pulse. */
+    skeleton: 900,
   },
   /** cubic-bezier(0.22, 1, 0.36, 1) — tabs + panel reveal */
   easeTab: [0.22, 1, 0.36, 1] as const,
