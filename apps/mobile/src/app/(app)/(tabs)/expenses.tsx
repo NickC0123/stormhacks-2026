@@ -5,6 +5,8 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { ExpenseBalanceDashboard } from '@/components/expenses/ExpenseBalanceDashboard';
 import { useExpenseBalances } from '@/hooks/useExpenseBalances';
 import { ExpenseInvitations } from '@/components/expenses/ExpenseInvitations';
+import { SpendingByCategory } from '@/components/expenses/SpendingByCategory';
+import { useSpending } from '@/hooks/useSpending';
 import { Screen } from '@/components/ui/Screen';
 import { listExpenses } from '@/lib/expenses';
 import { useTheme } from '@/theme';
@@ -13,6 +15,7 @@ import type { Expense } from '@/types';
 export default function ExpensesScreen() {
   const theme = useTheme();
   const balances = useExpenseBalances();
+  const spending = useSpending();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +45,7 @@ export default function ExpensesScreen() {
   }
 
   async function refresh() {
-    await Promise.all([balances.refresh(), listExpenses().then((rows) => {
+    await Promise.all([balances.refresh(), spending.refresh(), listExpenses().then((rows) => {
       setExpenses(rows); setHasMore(rows.length === 100); setError('');
     }).catch((err) => setError(err instanceof Error ? err.message : 'Could not load expenses.'))]);
   }
@@ -52,6 +55,7 @@ export default function ExpensesScreen() {
       <Pressable accessibilityRole="button" onPress={() => router.push('/expenses/new')} style={{ padding: 14, borderRadius: 10, backgroundColor: theme.colors.accent }}>
         <Text style={{ ...theme.typography.body, color: theme.colors.onAccent }}>New expense</Text>
       </Pressable>
+      <SpendingByCategory spending={spending} />
       <ExpenseBalanceDashboard balances={balances} />
       <ExpenseInvitations />
       {loading ? <ActivityIndicator /> : null}

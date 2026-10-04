@@ -68,6 +68,15 @@ class ExpenseBalancesRepo:
             if len(page) < 1000:
                 return rows
 
+    def list_items(self, expense_ids: list[str]) -> dict[str, list[dict]]:
+        items = {}
+        # Batched so the id filter stays within URL length limits.
+        for start in range(0, len(expense_ids), 100):
+            batch = expense_ids[start : start + 100]
+            rows = self.db.table("expenses").select("id,items").in_("id", batch).execute().data
+            items.update({row["id"]: row["items"] or [] for row in rows})
+        return items
+
 
 ExpenseBalancesRepoDep = Annotated[ExpenseBalancesRepo, Depends(ExpenseBalancesRepo)]
 

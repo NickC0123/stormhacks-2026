@@ -14,6 +14,7 @@ from tests.test_friends import FakeRepo as FakeFriendsRepo
 
 client = TestClient(app)
 ALICE, BOB, CAROL, DAVE = [str(uuid4()) for _ in range(4)]
+EMPTY = {"totals": [], "people": [], "unconverted_currencies": []}
 
 
 def expense(payer, amount, members, currency="CAD"):
@@ -122,7 +123,7 @@ def test_add_remove_and_accept_immediately_recalculate_shares_and_both_dashboard
     invite = client.post(path + "/invites", json={"user_id": DAVE}).json()["invite"]
     assert total()["owed_to_you"] == "60.00"  # Pending invite does not affect anyone's share.
     sign_in(DAVE)
-    assert client.get("/api/v1/balances").json() == {"totals": [], "people": []}
+    assert client.get("/api/v1/balances").json() == EMPTY
     assert client.post(f"/api/v1/expense-invites/{invite['id']}/accept").status_code == 200
     assert total()["you_owe"] == "22.50"
     sign_in(ALICE)
@@ -130,12 +131,27 @@ def test_add_remove_and_accept_immediately_recalculate_shares_and_both_dashboard
     assert client.delete(path + f"/members/{BOB}").status_code == 204
     assert total()["owed_to_you"] == "60.00"
     sign_in(BOB)
-    assert client.get("/api/v1/balances").json() == {"totals": [], "people": []}
+    assert client.get("/api/v1/balances").json() == EMPTY
     sign_in(ALICE)
     assert client.post(path + "/invites", json={"user_id": BOB}).json()["status"] == "added"
     assert total()["owed_to_you"] == "67.50"
     people.resources[expense_id]["amount"] = "120.00"
     assert total()["owed_to_you"] == "90.00"
+
+
+def test_balances_in_other_currencies_net_out_in_cad(setup):
+    people, _ = setup  # Alice paid 90.00 CAD for Alice, Bob and Carol.
+    usd = people.add_resource(BOB)
+    people.resources[usd].update(amount="100.00", currency="USD")
+    people.add_member(usd, ALICE)
+    data = client.get("/api/v1/balances").json()
+    # Bob owes 30.00; Alice owes Bob half of 142.46 CAD (100.00 USD), so she owes him 41.23.
+    assert data["totals"] == [{"currency": "CAD", "you_owe": "41.23", "owed_to_you": "30.00"}]
+    assert {p["user"]["id"]: (p["you_owe"], p["owed_to_you"]) for p in data["people"]} == {
+        BOB: ("41.23", "0.00"),
+        CAROL: ("0.00", "30.00"),
+    }
+    assert {p["currency"] for p in data["people"]} == {"CAD"}
 
 
 def test_payer_can_exclude_and_include_their_share_but_cannot_remove_the_last_person(setup):
@@ -148,13 +164,13 @@ def test_payer_can_exclude_and_include_their_share_but_cannot_remove_the_last_pe
     for user_id in [BOB, CAROL]:
         assert client.delete(path + f"/members/{user_id}").status_code == 204
     assert client.delete(path + f"/members/{ALICE}").status_code == 400
-    assert client.get("/api/v1/balances").json() == {"totals": [], "people": []}
+    assert client.get("/api/v1/balances").json() == EMPTY
 
 
 def test_unrelated_users_and_unauthenticated_callers_cannot_read_balances_or_shares(setup):
     _, expense_id = setup
     sign_in(DAVE)
     assert client.get(f"/api/v1/expenses/{expense_id}/people").status_code == 404
-    assert client.get("/api/v1/balances").json() == {"totals": [], "people": []}
+    assert client.get("/api/v1/balances").json() == EMPTY
     app.dependency_overrides.pop(get_current_user)
     assert client.get("/api/v1/balances").status_code == 401

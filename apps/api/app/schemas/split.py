@@ -41,8 +41,12 @@ class CurrencyBalance(BaseModel):
 
 
 class BalanceDashboard(BaseModel):
+    """Amounts are converted to CAD at fixed approximate rates."""
+
     totals: list[CurrencyBalance]
     people: list[PersonBalance]
+    # Expenses in these currencies have no rate and are left out.
+    unconverted_currencies: list[str] = []
 
 
 class ItemAssignment(BaseModel):

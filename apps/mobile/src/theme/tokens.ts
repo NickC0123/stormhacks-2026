@@ -1,6 +1,7 @@
 import type { TextStyle, ViewStyle } from 'react-native';
 
 import { fonts } from '@/theme/fonts';
+import type { ItemCategory } from '@/types';
 
 /** Primitive color ramps. Components must not consume these directly. */
 export const primitives = {
@@ -32,6 +33,29 @@ export const primitives = {
   emerald700: '#047857',
   /** Opaque success surface for dark mode. */
   emerald900: '#064e3b',
+  /** Spending chart category hues: 600-ish for light surfaces, 400-ish for dark. */
+  green600: '#16a34a',
+  green400: '#4ade80',
+  orange600: '#ea580c',
+  orange400: '#fb923c',
+  blue600: '#2563eb',
+  blue400: '#60a5fa',
+  pink600: '#db2777',
+  pink400: '#f472b6',
+  violet600: '#7c3aed',
+  violet400: '#a78bfa',
+  amber600: '#d97706',
+  amber400: '#fbbf24',
+  cyan700: '#0e7490',
+  cyan400: '#22d3ee',
+  indigo500: '#6366f1',
+  indigo300: '#a5b4fc',
+  lime700: '#4d7c0f',
+  lime400: '#a3e635',
+  fuchsia600: '#c026d3',
+  fuchsia400: '#e879f9',
+  stone500: '#78716c',
+  stone400: '#a8a29e',
   iosGray6: '#f2f2f7',
   iosGray6Dark: '#1c1c1e',
   glyphPrimary: '#595959',
@@ -75,7 +99,28 @@ export type ThemeColors = {
   /** Success snackbar surface + label/icon (Figma). */
   successSubtle: string;
   success: string;
+  /** Spending chart segment per expense category. Always pair with a text label. */
+  chartCategory: Record<ItemCategory, string>;
 };
+
+function chartCategoryColors(scheme: ColorScheme): Record<ItemCategory, string> {
+  const dark = scheme === 'dark';
+  return {
+    groceries: dark ? primitives.green400 : primitives.green600,
+    food_drinks: dark ? primitives.orange400 : primitives.orange600,
+    transportation: dark ? primitives.blue400 : primitives.blue600,
+    shopping: dark ? primitives.pink400 : primitives.pink600,
+    entertainment: dark ? primitives.violet400 : primitives.violet600,
+    housing: dark ? primitives.amber400 : primitives.amber600,
+    bills_utilities: dark ? primitives.cyan400 : primitives.cyan700,
+    subscriptions: dark ? primitives.indigo300 : primitives.indigo500,
+    health_fitness: dark ? primitives.red500 : primitives.red600,
+    education: dark ? primitives.lime400 : primitives.lime700,
+    personal_care: dark ? primitives.fuchsia400 : primitives.fuchsia600,
+    work: dark ? primitives.gray400 : primitives.gray600,
+    other: dark ? primitives.stone400 : primitives.stone500,
+  };
+}
 
 export function createColors(scheme: ColorScheme): ThemeColors {
   if (scheme === 'dark') {
@@ -110,6 +155,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
       navItemInactive: primitives.gray400,
       successSubtle: primitives.emerald900,
       success: primitives.emerald300,
+      chartCategory: chartCategoryColors(scheme),
     };
   }
 
@@ -144,6 +190,7 @@ export function createColors(scheme: ColorScheme): ThemeColors {
     navItemInactive: primitives.glyphPrimary,
     successSubtle: primitives.emerald100,
     success: primitives.emerald700,
+    chartCategory: chartCategoryColors(scheme),
   };
 }
 
@@ -294,6 +341,13 @@ export const sizes = {
   navPaddingX: 24,
   /** Bottom content fade height (Figma Events scrim ~130). */
   bottomFade: 130,
+  /** Donut chart outer diameter and ring thickness. */
+  donut: 168,
+  donutStroke: 24,
+  /** Space between donut segments. */
+  donutGap: 2,
+  /** Legend color swatch. */
+  swatch: 12,
 } as const;
 
 export const opacity = {
