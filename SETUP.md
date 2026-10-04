@@ -72,8 +72,10 @@ expense to attach a receipt later. Events are optional. Splitting is not include
 The authenticated API provides `GET/POST /api/v1/expenses`,
 `GET/PUT /api/v1/expenses/{id}`, and `POST/GET /api/v1/expenses/{id}/receipt`.
 Expense date and optional time are local calendar values; scans with only a date
-leave time empty. Item amounts and the overall amount are independent, and parser
-warnings and original JSON are retained for review.
+leave time empty. The app calculates the overall amount from the items, minus the
+receipt discount, plus tax and tip from a scanned receipt; it cannot be edited directly.
+If a scanned receipt's printed total differs from that amount, the form shows a mismatch warning.
+Parser warnings and original JSON are retained for review.
 
 ### Event and expense people
 
