@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PeopleManager } from '@/components/people/PeopleManager';
 import { NativeSelect } from '@/components/ui/NativeSelect';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
@@ -660,6 +661,22 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 onChange={(eventId) => field('event_id', eventId || null)}
               />
             </View>
+            {!isDrawer ? (
+              <>
+                <Text style={styles.sectionLabel}>Equal split</Text>
+                <Text style={styles.hint}>
+                  {form.event_id
+                    ? 'Event members are selected by default when you save. You can change the people for this expense.'
+                    : 'Select the people sharing this expense after saving.'}{' '}
+                  Saving expense changes updates the shares.
+                </Text>
+                {savedId ? (
+                  <PeopleManager key={`${savedId}:${splitVersion}`} kind="expense" id={savedId} />
+                ) : (
+                  <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>
+                )}
+              </>
+            ) : null}
           </>
         ) : null}
 
