@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api';
 import type {
   EventDetail,
+  EventWrite,
   EventHomeItem,
   EventSummary,
   EventUser,
@@ -16,8 +17,24 @@ export function getEvent(eventId: string): Promise<EventDetail> {
   return apiFetch<EventDetail>(`/events/${eventId}`);
 }
 
-export function updateEvent(eventId: string, body: Pick<EventDetail, 'title' | 'description' | 'starts_at'>): Promise<EventDetail> {
+export function updateEvent(eventId: string, body: EventWrite): Promise<EventDetail> {
   return apiFetch<EventDetail>(`/events/${eventId}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function createEvent(body: EventWrite & { member_ids: string[]; invite_usernames: string[] }): Promise<EventListCreated> {
+  return apiFetch<EventListCreated>('/events', { method: 'POST', body: JSON.stringify(body) });
+}
+
+type EventListCreated = EventWrite & { id: string; member_ids: string[] };
+
+export function formatEventSchedule(startsAt: string | null, endsAt: string | null): string | null {
+  if (!startsAt) return null;
+  const start = new Date(startsAt);
+  const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  const label = `${formatEventDate(startsAt)} · ${start.toLocaleTimeString(undefined, options)}`;
+  if (!endsAt) return label;
+  const end = new Date(endsAt);
+  return `${label} – ${start.toDateString() === end.toDateString() ? '' : `${formatEventDate(endsAt)} · `}${end.toLocaleTimeString(undefined, options)}`;
 }
 
 /** Host only. Deletes the event with its expenses, photos and payments. */

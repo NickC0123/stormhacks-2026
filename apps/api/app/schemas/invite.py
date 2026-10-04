@@ -50,6 +50,8 @@ class EventDetail(BaseModel):
     title: str
     description: str | None = None
     starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    location: str | None = None
     created_by: UUID
     created_at: datetime
     members: list[EventUser]

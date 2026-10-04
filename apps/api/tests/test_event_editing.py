@@ -37,12 +37,16 @@ def test_host_edits_details_preserving_members_and_identity(event):
             "title": "  New trip  ",
             "description": "  Updated plan  ",
             "starts_at": "2026-10-12T12:00:00Z",
+            "ends_at": "2026-10-12T14:00:00Z",
+            "location": "  Restaurant  ",
         },
     )
     assert result.status_code == 200
     detail = result.json()
     assert detail["title"] == "New trip"
     assert detail["description"] == "Updated plan"
+    assert detail["location"] == "Restaurant"
+    assert detail["ends_at"].startswith("2026-10-12T14:00:00")
     assert detail["starts_at"].startswith("2026-10-12T12:00:00")
     assert detail["id"] == before["id"]
     assert detail["created_by"] == before["created_by"]

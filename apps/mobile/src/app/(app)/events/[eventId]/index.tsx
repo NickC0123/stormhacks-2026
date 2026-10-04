@@ -17,7 +17,7 @@ import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { Tabs } from '@/components/ui/Tabs';
 import { useFocusedData } from '@/hooks/useFocusedData';
-import { deleteEvent, formatEventDate, getEvent } from '@/lib/events';
+import { deleteEvent, formatEventSchedule, getEvent } from '@/lib/events';
 import { useProfile } from '@/lib/profile';
 import { useTheme, type Theme } from '@/theme';
 
@@ -100,7 +100,7 @@ export default function EventScreen() {
     );
   }
 
-  const date = formatEventDate(event.starts_at ?? event.created_at);
+  const date = formatEventSchedule(event.starts_at, event.ends_at) ?? 'Date not set';
   const isHost = event.created_by === profile?.id;
 
   return (
@@ -108,7 +108,7 @@ export default function EventScreen() {
       <Screen
         title={event.title}
         description={date || undefined}
-        detail={event.description?.trim() || undefined}
+        detail={[event.location?.trim(), event.description?.trim()].filter(Boolean).join('\n') || undefined}
         onRefresh={() => { setRefreshVersion((version) => version + 1); void refresh(); }}
         refreshing={refreshing}
         headerLeft={<EventBackButton />}

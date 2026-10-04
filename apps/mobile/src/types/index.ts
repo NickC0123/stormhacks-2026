@@ -166,7 +166,17 @@ export type EventPhotoPreview = {
   url: string;
 };
 
+export type EventWrite = {
+  title: string;
+  description: string | null;
+  location: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
 export type EventListItem = EventSummary & {
+  location: string | null;
+  ends_at: string | null;
   description: string | null;
   created_by: UUID;
   created_at: string;
