@@ -1,18 +1,42 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
+from app.api.v1.routes.events import get_member_event
 from app.core.auth import CurrentUserDep
-from app.schemas.balance import Balance
+from app.schemas.split import BalanceDashboard
+from app.services.event_invites import EventInvitesRepoDep
+from app.services.expense_splits import ExpenseBalancesRepoDep, balance_dashboard
+from app.services.friends import FriendsRepoDep
 
 router = APIRouter(tags=["balances"])
 
 
-@router.get("/balances", response_model=list[Balance])
-def my_balances(user: CurrentUserDep) -> list[Balance]:
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+def load_dashboard(user_id: str, repo, friends, event_id: str | None = None) -> BalanceDashboard:
+    rows = repo.list_inputs(user_id, event_id)
+    ids = {row["created_by"] for row in rows}
+    for row in rows:
+        ids.update(row["member_ids"])
+    profiles = {p["id"]: p for p in friends.get_profiles(list(ids))}
+    return balance_dashboard(rows, user_id, profiles)
 
 
-@router.get("/events/{event_id}/balances", response_model=list[Balance])
-def event_balances(event_id: UUID, user: CurrentUserDep) -> list[Balance]:
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+@router.get("/balances", response_model=BalanceDashboard)
+def my_balances(
+    user: CurrentUserDep,
+    repo: ExpenseBalancesRepoDep,
+    friends: FriendsRepoDep,
+) -> BalanceDashboard:
+    return load_dashboard(user.id, repo, friends)
+
+
+@router.get("/events/{event_id}/balances", response_model=BalanceDashboard)
+def event_balances(
+    event_id: UUID,
+    user: CurrentUserDep,
+    repo: ExpenseBalancesRepoDep,
+    events: EventInvitesRepoDep,
+    friends: FriendsRepoDep,
+) -> BalanceDashboard:
+    get_member_event(events, event_id, user.id)
+    return load_dashboard(user.id, repo, friends, str(event_id))

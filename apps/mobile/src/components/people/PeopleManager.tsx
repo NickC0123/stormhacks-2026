@@ -52,6 +52,8 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
   const memberIds = new Set(people.members.map((member) => member.id));
   const invitedIds = new Set(people.invites.map((invite) => invite.user.id));
   const friendIds = new Set(friends.friends.map(({ user }) => user.id));
+  const split = people.split;
+  const canManageSplit = kind === 'expense' && people.created_by === profile?.id;
   const pending = [...friends.incoming, ...friends.outgoing];
 
   return <View style={styles.content}>
@@ -63,13 +65,25 @@ export function PeopleManager({ kind, id }: { kind: PeopleKind; id: string }) {
       onSubmitEditing={submit} returnKeyType="send" error={formError} disabled={busyIds.has('username')} />
     <Button label="Add or invite" onPress={submit} loading={busyIds.has('username')} disabled={!username.trim()} />
     {notice ? <Text style={styles.text} accessibilityLiveRegion="polite">{notice}</Text> : null}
-    <ListGroup title="Members" count={people.members.length}>
+    {split ? <>
+      <Text style={styles.text}>Paid by {split.paid_by.id === profile?.id ? 'you' : displayName(split.paid_by)} · {split.currency} {split.total}</Text>
+      <Text style={styles.text}>Equal shares update when people are added or removed. Pending invitations are excluded until accepted.</Text>
+      {canManageSplit && !memberIds.has(people.created_by) ? <Button label="Include my share" variant="secondary"
+        loading={busyIds.has(people.created_by)} onPress={() => run(people.created_by,
+          () => add({ user_id: people.created_by }), 'Could not include your share')} /> : null}
+    </> : null}
+    <ListGroup title={kind === 'expense' ? 'Split between' : 'Members'} count={people.members.length}>
       {people.members.map((member) => {
         const creator = member.id === people.created_by;
         const me = member.id === profile?.id;
         return <FriendRow key={member.id} username={member.username ?? 'unknown'}
-          subtitle={creator ? 'Creator' : me ? 'You' : undefined}
-          actions={!creator && !me && friendIds.has(member.id) ? <Button label="Remove" size="sm" variant="ghost"
+          subtitle={split
+            ? `${me ? 'You · ' : ''}${split.currency} ${split.shares.find((share) => share.user.id === member.id)?.amount ?? '0.00'}`
+            : creator ? 'Creator' : me ? 'You' : undefined}
+          actions={(kind === 'expense'
+            ? canManageSplit || (!creator && !me && friendIds.has(member.id))
+            : !creator && !me && friendIds.has(member.id)) ? <Button label={me ? 'Exclude my share' : 'Remove'} size="sm" variant="ghost"
+            disabled={kind === 'expense' && people.members.length <= 1}
             loading={busyIds.has(member.id)} accessibilityLabel={`Remove ${displayName(member)}`}
             onPress={() => run(member.id, () => removePerson(kind, id, member.id), 'Could not remove person')} /> : null} />;
       })}

@@ -1,9 +1,9 @@
 import { apiFetch } from '@/lib/api';
 import { getEvent } from '@/lib/events';
-import type { EventInvite, EventUser, IncomingExpenseInvite, PersonAdded } from '@/types';
+import type { EventInvite, EventUser, ExpenseSplit, IncomingExpenseInvite, PersonAdded } from '@/types';
 
 export type PeopleKind = 'event' | 'expense';
-export type PeopleDetail = { created_by: string; members: EventUser[]; invites: EventInvite[] };
+export type PeopleDetail = { created_by: string; members: EventUser[]; invites: EventInvite[]; split?: ExpenseSplit };
 const base = (kind: PeopleKind, id: string) => `/${kind === 'event' ? 'events' : 'expenses'}/${id}`;
 
 export function getPeople(kind: PeopleKind, id: string): Promise<PeopleDetail> {

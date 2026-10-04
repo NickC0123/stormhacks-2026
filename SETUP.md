@@ -103,6 +103,29 @@ Expenses provide `GET /api/v1/expenses/{id}/people`, `POST /api/v1/expenses/{id}
 `POST /api/v1/expense-invites/{id}/accept`, and `DELETE /api/v1/expense-invites/{id}`.
 Both add endpoints accept either `user_id` or `username` and return `status: added` or `status: invited`.
 
+### Equal expense splits and balances
+
+Apply `supabase/migrations/20261004000007_equal_expense_splits.sql` after the expense people migration.
+The creator is the payer. Event expenses start with the event's members; standalone expenses start
+with the creator. Add or remove people under **Equal split** to change the participants for that
+expense. The payer can exclude or include their own share, and at least one participant is required.
+Pending invitees enter the split only when they accept. Shares are recalculated from the saved total
+and current participants, with deterministic rounding in cents. Saving a new amount updates the split.
+Moving an expense to another event selects that event's members only if the split was never customized.
+Event membership changes do not rewrite saved expense selections.
+
+The Expenses tab shows how much each user owes and is owed, grouped by person and currency, plus
+links to the expenses contributing to each balance. Opposite debts with the same person cancel out;
+different currencies stay separate. The dashboard refreshes on focus, on pull-to-refresh, and every
+15 seconds while focused. `GET /api/v1/balances` returns this dashboard; event-specific dashboards
+are available at `GET /api/v1/events/{id}/balances`. Expense people responses include each share.
+These balances reflect expense splits; repayment tracking is not implemented yet.
+
+The database seeds default participants in the same transaction as expense creation. Manual edits
+mark the split customized, and deleting the last participant is rejected in both the API and database.
+`apps/api/tests/sql/equal_expense_splits.sql` contains fixtures and assertions for testing the migration
+in an isolated PostgreSQL database (run fixtures before the migration, assertions afterward).
+
 ### Using a physical phone
 
 Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.cloud` to your computer’s LAN IP on port 8000. Make sure the phone and computer are on the same Wi-Fi. Update that URL when your LAN IP changes.

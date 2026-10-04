@@ -1,18 +1,11 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
-class EventUser(BaseModel):
-    id: UUID
-    username: str | None
-
-    @classmethod
-    def lookup(cls, profiles: dict[str, dict[str, Any]], user_id: str) -> "EventUser":
-        profile = profiles.get(user_id)
-        return cls(id=user_id, username=profile.get("username") if profile else None)
+from app.schemas.person import EventUser
+from app.schemas.split import ExpenseSplit
 
 
 class EventSummary(BaseModel):
@@ -82,6 +75,7 @@ class IncomingExpenseInvite(BaseModel):
 
 
 class ExpensePeople(BaseModel):
+    split: ExpenseSplit
     created_by: UUID
     members: list[EventUser]
     invites: list[EventInvite]

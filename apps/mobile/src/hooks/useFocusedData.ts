@@ -57,7 +57,10 @@ export function useFocusedData<T>(loader: () => Promise<T>, errorMessage: string
     }
   }
 
+  const reload = useCallback(() => load('silent'), [load]);
+
   return {
+    reload,
     data,
     loading,
     refreshing,

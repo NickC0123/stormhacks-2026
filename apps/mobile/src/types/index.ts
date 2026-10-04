@@ -209,3 +209,23 @@ export type IncomingExpenseInvite = {
   invited_by: EventUser;
   created_at: string;
 };
+
+export type ExpenseSplit = {
+  expense_id: string;
+  paid_by: EventUser;
+  currency: string;
+  total: string;
+  customized: boolean;
+  shares: { user: EventUser; amount: string }[];
+};
+
+export type BalanceDashboard = {
+  totals: { currency: string; you_owe: string; owed_to_you: string }[];
+  people: {
+    user: EventUser;
+    currency: string;
+    you_owe: string;
+    owed_to_you: string;
+    expenses: { expense_id: string; title: string; amount: string }[];
+  }[];
+};
