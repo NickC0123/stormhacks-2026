@@ -81,7 +81,7 @@ Parser warnings and original JSON are retained for review.
 
 Apply `supabase/migrations/20261004000002_event_invites.sql` in the hosted SQL editor once.
 
-Apply `supabase/migrations/20261004000004_expense_people.sql` for expense participants and invitations.
+Apply `supabase/migrations/20261004000006_expense_people.sql` for expense participants and invitations.
 Accepted friends can be added or removed immediately from events and expenses.
 People with pending friend requests or no friendship receive an invitation and join only after accepting.
 Event invitations appear on the events screen; expense invitations appear on the expenses screen.
