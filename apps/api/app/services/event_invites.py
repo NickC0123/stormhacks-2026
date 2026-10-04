@@ -13,37 +13,49 @@ class DuplicateInviteError(Exception):
     pass
 
 
-class EventInvitesRepo:
-    """Supabase access for events, members, and invites. Uses the service-role client."""
+class PeopleRepo:
+    """Membership and pending invitations, scoped to one resource type."""
+
+    resource_table = "events"
+    member_table = "event_members"
+    invite_table = "event_invites"
+    resource_key = "event_id"
 
     def __init__(self) -> None:
         self.db = get_supabase()
 
-    def get_event(self, event_id: str) -> Row | None:
-        rows = self.db.table("events").select("*").eq("id", event_id).limit(1).execute().data
+    def get_resource(self, resource_id: str) -> Row | None:
+        rows = (
+            self.db.table(self.resource_table)
+            .select("*")
+            .eq("id", resource_id)
+            .limit(1)
+            .execute()
+            .data
+        )
         return rows[0] if rows else None
 
-    def get_events(self, event_ids: list[str]) -> list[Row]:
-        if not event_ids:
+    def get_resources(self, resource_ids: list[str]) -> list[Row]:
+        if not resource_ids:
             return []
-        return self.db.table("events").select("*").in_("id", event_ids).execute().data
+        return self.db.table(self.resource_table).select("*").in_("id", resource_ids).execute().data
 
-    def list_member_ids(self, event_id: str) -> list[str]:
+    def list_member_ids(self, resource_id: str) -> list[str]:
         rows = (
-            self.db.table("event_members")
+            self.db.table(self.member_table)
             .select("user_id")
-            .eq("event_id", event_id)
+            .eq(self.resource_key, resource_id)
             .order("joined_at")
             .execute()
             .data
         )
         return [row["user_id"] for row in rows]
 
-    def is_member(self, event_id: str, user_id: str) -> bool:
+    def is_member(self, resource_id: str, user_id: str) -> bool:
         rows = (
-            self.db.table("event_members")
+            self.db.table(self.member_table)
             .select("user_id")
-            .eq("event_id", event_id)
+            .eq(self.resource_key, resource_id)
             .eq("user_id", user_id)
             .limit(1)
             .execute()
@@ -51,24 +63,24 @@ class EventInvitesRepo:
         )
         return bool(rows)
 
-    def add_member(self, event_id: str, user_id: str) -> None:
-        self.db.table("event_members").upsert(
-            {"event_id": event_id, "user_id": user_id},
-            on_conflict="event_id,user_id",
+    def add_member(self, resource_id: str, user_id: str) -> None:
+        self.db.table(self.member_table).upsert(
+            {self.resource_key: resource_id, "user_id": user_id},
+            on_conflict=f"{self.resource_key},user_id",
             ignore_duplicates=True,
         ).execute()
 
     def get_invite(self, invite_id: str) -> Row | None:
         rows = (
-            self.db.table("event_invites").select("*").eq("id", invite_id).limit(1).execute().data
+            self.db.table(self.invite_table).select("*").eq("id", invite_id).limit(1).execute().data
         )
         return rows[0] if rows else None
 
-    def list_event_invites(self, event_id: str) -> list[Row]:
+    def list_resource_invites(self, resource_id: str) -> list[Row]:
         return (
-            self.db.table("event_invites")
+            self.db.table(self.invite_table)
             .select("*")
-            .eq("event_id", event_id)
+            .eq(self.resource_key, resource_id)
             .order("created_at")
             .execute()
             .data
@@ -76,7 +88,7 @@ class EventInvitesRepo:
 
     def list_incoming_invites(self, user_id: str) -> list[Row]:
         return (
-            self.db.table("event_invites")
+            self.db.table(self.invite_table)
             .select("*")
             .eq("invitee_id", user_id)
             .order("created_at", desc=True)
@@ -84,11 +96,17 @@ class EventInvitesRepo:
             .data
         )
 
-    def create_invite(self, event_id: str, inviter_id: str, invitee_id: str) -> Row:
+    def create_invite(self, resource_id: str, inviter_id: str, invitee_id: str) -> Row:
         try:
             return (
-                self.db.table("event_invites")
-                .insert({"event_id": event_id, "inviter_id": inviter_id, "invitee_id": invitee_id})
+                self.db.table(self.invite_table)
+                .insert(
+                    {
+                        self.resource_key: resource_id,
+                        "inviter_id": inviter_id,
+                        "invitee_id": invitee_id,
+                    }
+                )
                 .execute()
                 .data[0]
             )
@@ -98,7 +116,24 @@ class EventInvitesRepo:
             raise
 
     def delete_invite(self, invite_id: str) -> None:
-        self.db.table("event_invites").delete().eq("id", invite_id).execute()
+        self.db.table(self.invite_table).delete().eq("id", invite_id).execute()
+
+    def remove_member(self, resource_id: str, user_id: str) -> None:
+        self.db.table(self.member_table).delete().eq(self.resource_key, resource_id).eq(
+            "user_id", user_id
+        ).execute()
 
 
+class EventInvitesRepo(PeopleRepo):
+    pass
+
+
+class ExpensePeopleRepo(PeopleRepo):
+    resource_table = "expenses"
+    member_table = "expense_members"
+    invite_table = "expense_invites"
+    resource_key = "expense_id"
+
+
+ExpensePeopleRepoDep = Annotated[ExpensePeopleRepo, Depends(ExpensePeopleRepo)]
 EventInvitesRepoDep = Annotated[EventInvitesRepo, Depends(EventInvitesRepo)]

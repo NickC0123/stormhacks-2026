@@ -35,6 +35,15 @@ class Query:
         self.filters.append(lambda row: row.get(name) in values)
         return self
 
+    def or_(self, expression):
+        owner, ids = expression.split(",id.in.(")
+        user_id = owner.removeprefix("created_by.eq.")
+        expense_ids = ids.removesuffix(")").split(",")
+        self.filters.append(
+            lambda row: row.get("created_by") == user_id or row["id"] in expense_ids
+        )
+        return self
+
     def order(self, *args, **kwargs):
         return self
 
@@ -74,7 +83,7 @@ class Query:
 
 class DB:
     def __init__(self):
-        self.rows = {"expenses": [], "events": [], "event_members": []}
+        self.rows = {"expenses": [], "events": [], "event_members": [], "expense_members": []}
         self.fail_update = False
 
     def table(self, name):
@@ -125,9 +134,19 @@ def test_manual_expense_without_event_saved_and_listed(db, body):
 @pytest.mark.parametrize(
     "category",
     [
-        "groceries", "food_drinks", "transportation", "shopping", "entertainment",
-        "housing", "bills_utilities", "subscriptions", "health_fitness", "education",
-        "personal_care", "work", "other",
+        "groceries",
+        "food_drinks",
+        "transportation",
+        "shopping",
+        "entertainment",
+        "housing",
+        "bills_utilities",
+        "subscriptions",
+        "health_fitness",
+        "education",
+        "personal_care",
+        "work",
+        "other",
     ],
 )
 def test_current_expense_categories_are_accepted(db, body, category):
@@ -140,8 +159,10 @@ def test_current_expense_categories_are_accepted(db, body, category):
 @pytest.mark.parametrize(
     "old,new",
     [
-        ("coffee", "food_drinks"), ("food", "food_drinks"),
-        ("drinks", "food_drinks"), ("alcohol", "food_drinks"),
+        ("coffee", "food_drinks"),
+        ("food", "food_drinks"),
+        ("drinks", "food_drinks"),
+        ("alcohol", "food_drinks"),
         ("transport", "transportation"),
     ],
 )
@@ -341,3 +362,29 @@ def test_discount_items_can_be_negative_while_total_stays_nonnegative(db, body):
     expense = response.json()
     assert expense["items"][1]["amount"] == "-2.00"
     assert expense["amount"] == "10.50"
+
+
+def test_participants_can_read_expenses_and_receipts_but_cannot_edit(db, body, monkeypatch):
+    expense = create(body).json()
+    expense_id = expense["id"]
+    db.rows["expense_members"].append({"expense_id": expense_id, "user_id": OTHER})
+    db.rows["expenses"][0]["receipt_image_path"] = "owner/receipt.jpg"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=OTHER)
+    path = f"/api/v1/expenses/{expense_id}"
+    assert client.get(path).status_code == 200
+    assert [e["id"] for e in client.get("/api/v1/expenses").json()] == [expense_id]
+    monkeypatch.setattr(route, "signed_url", lambda *args: "https://example.com/receipt")
+    assert client.get(path + "/receipt").status_code == 200
+    assert client.put(path, json=body).status_code == 404
+    assert client.post(path + "/receipt", files={"file": ("r.jpg", JPEG)}).status_code == 404
+    db.rows["expense_members"].clear()
+    assert client.get(path).status_code == 404
+    assert client.get(path + "/receipt").status_code == 404
+    assert client.get("/api/v1/expenses").json() == []
+
+
+def test_joined_expenses_keep_event_filter_and_do_not_duplicate_owned_expenses(db, body):
+    expense = create(body).json()
+    db.rows["expense_members"].append({"expense_id": expense["id"], "user_id": USER})
+    assert len(client.get("/api/v1/expenses").json()) == 1
+    assert client.get(f"/api/v1/expenses?event_id={EVENT}").json() == []

@@ -175,3 +175,16 @@ export type Expense = ExpenseWrite & {
   created_at: string;
   receipt_image_path: string | null;
 };
+
+export type PersonAdded = {
+  status: 'added' | 'invited';
+  user: EventUser;
+  invite: EventInvite | null;
+};
+
+export type IncomingExpenseInvite = {
+  id: UUID;
+  expense: { id: UUID; title: string };
+  invited_by: EventUser;
+  created_at: string;
+};

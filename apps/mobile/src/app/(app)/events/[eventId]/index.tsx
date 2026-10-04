@@ -41,7 +41,7 @@ export default function EventScreen() {
       <View style={styles.content}>
         <View style={styles.actions}>
           <Button
-            label="Invite friends"
+            label="Manage people"
             onPress={() => router.push({ pathname: '/events/[eventId]/invite', params: { eventId } })}
           />
           <Button

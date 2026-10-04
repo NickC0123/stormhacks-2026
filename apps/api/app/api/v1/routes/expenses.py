@@ -14,18 +14,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
 
-def require_expense(expense_id: UUID, user_id: str) -> dict:
-    rows = (
-        get_supabase()
-        .table("expenses")
-        .select("*")
-        .eq("id", str(expense_id))
-        .eq("created_by", user_id)
-        .execute()
-        .data
-    )
+def require_expense(expense_id: UUID, user_id: str, *, owner_only: bool = True) -> dict:
+    db = get_supabase()
+    query = db.table("expenses").select("*").eq("id", str(expense_id))
+    if owner_only:
+        query = query.eq("created_by", user_id)
+    rows = query.execute().data
     if not rows:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Expense not found")
+    if rows[0]["created_by"] != user_id:
+        members = (
+            db.table("expense_members")
+            .select("user_id")
+            .eq("expense_id", str(expense_id))
+            .eq("user_id", user_id)
+            .execute()
+            .data
+        )
+        if not members:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Expense not found")
     return rows[0]
 
 
@@ -57,7 +64,16 @@ def list_expenses(
     limit: int = Query(default=100, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> list[Expense]:
-    query = get_supabase().table("expenses").select("*").eq("created_by", user.id)
+    db = get_supabase()
+    memberships = (
+        db.table("expense_members").select("expense_id").eq("user_id", user.id).execute().data
+    )
+    query = db.table("expenses").select("*")
+    if memberships:
+        ids = ",".join(row["expense_id"] for row in memberships)
+        query = query.or_(f"created_by.eq.{user.id},id.in.({ids})")
+    else:
+        query = query.eq("created_by", user.id)
     if event_id is not None:
         query = query.eq("event_id", str(event_id))
     rows = (
@@ -83,7 +99,7 @@ def create_expense(body: ExpenseWrite, user: CurrentUserDep) -> Expense:
 
 @router.get("/{expense_id}", response_model=Expense)
 def get_expense(expense_id: UUID, user: CurrentUserDep) -> Expense:
-    return Expense.model_validate(require_expense(expense_id, user.id))
+    return Expense.model_validate(require_expense(expense_id, user.id, owner_only=False))
 
 
 @router.put("/{expense_id}", response_model=Expense)
@@ -157,7 +173,7 @@ def attach_receipt(expense_id: UUID, file: UploadFile, user: CurrentUserDep) -> 
 
 @router.get("/{expense_id}/receipt", response_model=ReceiptImage)
 def get_receipt_image(expense_id: UUID, user: CurrentUserDep) -> ReceiptImage:
-    expense = require_expense(expense_id, user.id)
+    expense = require_expense(expense_id, user.id, owner_only=False)
     if not expense.get("receipt_image_path"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This expense has no receipt image")
     return ReceiptImage(

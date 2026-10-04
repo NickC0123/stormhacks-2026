@@ -75,17 +75,31 @@ Expense date and optional time are local calendar values; scans with only a date
 leave time empty. Item amounts and the overall amount are independent, and parser
 warnings and original JSON are retained for review.
 
-### Event invites
+### Event and expense people
 
 Apply `supabase/migrations/20261004000002_event_invites.sql` in the hosted SQL editor once.
 
-Open an event and choose **Invite friends** to invite accepted friends. Any member can
-invite their own friends. Invites appear under **Invitations** on the Events tab, where
-the friend can join or decline; members can cancel pending invites from the event page.
+Apply `supabase/migrations/20261004000004_expense_people.sql` for expense participants and invitations.
+Accepted friends can be added or removed immediately from events and expenses.
+People with pending friend requests or no friendship receive an invitation and join only after accepting.
+Event invitations appear on the events screen; expense invitations appear on the expenses screen.
+Accepting either invitation does not accept or create a friendship.
+Any member can add their friends or invite other people by username. Members can remove their accepted
+friends, except the creator; only the expense creator can edit expense details or attach a receipt.
+Expense participation is independent of event membership. Save a new expense before managing its people.
+
+Open an event and choose **Manage people**, or use **People** on a saved expense.
+Friends appear with **Add**; pending friend requests appear with **Invite**. Use **Add by username**
+for anyone else. Pending invitations can be cancelled before they are accepted.
 
 The authenticated API provides `GET /api/v1/events/{id}` (members and pending invites),
 `POST /api/v1/events/{id}/invites`, `GET /api/v1/invites`,
-`POST /api/v1/invites/{id}/accept`, and `DELETE /api/v1/invites/{id}`.
+`POST /api/v1/invites/{id}/accept`, `DELETE /api/v1/invites/{id}`, and
+`DELETE /api/v1/events/{id}/members/{user_id}`.
+Expenses provide `GET /api/v1/expenses/{id}/people`, `POST /api/v1/expenses/{id}/invites`,
+`DELETE /api/v1/expenses/{id}/members/{user_id}`, `GET /api/v1/expense-invites`,
+`POST /api/v1/expense-invites/{id}/accept`, and `DELETE /api/v1/expense-invites/{id}`.
+Both add endpoints accept either `user_id` or `username` and return `status: added` or `status: invited`.
 
 ### Using a physical phone
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PeopleManager } from '@/components/people/PeopleManager';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
 import { attachExpenseReceipt, getExpense, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
@@ -200,6 +201,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             style={[styles.choice, (form.event_id ?? '') === event.id && styles.selected]}
           ><Text style={styles.text}>{event.title}</Text></Pressable>)}
         </View>
+        <Text style={styles.heading}>People</Text>
+        {savedId ? <PeopleManager kind="expense" id={savedId} /> : <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>}
         <Text style={styles.heading}>Items (optional)</Text>
         {form.items.map((item, index) => <View key={item.id ?? index} style={styles.item}>
           <Field label={`Item ${index + 1} name`} value={item.name} onChangeText={(name) => editItem(index, { name })} styles={styles} editable={!busy} />

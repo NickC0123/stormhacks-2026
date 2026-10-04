@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class EventUser(BaseModel):
@@ -22,7 +22,16 @@ class EventSummary(BaseModel):
 
 
 class InviteCreate(BaseModel):
-    user_id: UUID
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: UUID | None = None
+    username: str | None = Field(default=None, max_length=21)
+
+    @model_validator(mode="after")
+    def one_person(self) -> "InviteCreate":
+        if (self.user_id is None) == (self.username is None):
+            raise ValueError("Provide either a user ID or a username")
+        return self
 
 
 class EventInvite(BaseModel):
@@ -50,5 +59,29 @@ class EventDetail(BaseModel):
     starts_at: datetime | None = None
     created_by: UUID
     created_at: datetime
+    members: list[EventUser]
+    invites: list[EventInvite]
+
+
+class PersonAdded(BaseModel):
+    status: Literal["added", "invited"]
+    user: EventUser
+    invite: EventInvite | None = None
+
+
+class ExpenseSummary(BaseModel):
+    id: UUID
+    title: str
+
+
+class IncomingExpenseInvite(BaseModel):
+    id: UUID
+    expense: ExpenseSummary
+    invited_by: EventUser
+    created_at: datetime
+
+
+class ExpensePeople(BaseModel):
+    created_by: UUID
     members: list[EventUser]
     invites: list[EventInvite]

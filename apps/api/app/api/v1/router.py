@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     balances,
     dashboard,
     events,
+    expense_people,
     expenses,
     friends,
     health,
@@ -21,6 +22,7 @@ api_router.include_router(events.router)
 api_router.include_router(invites.router)
 api_router.include_router(receipts.router)
 api_router.include_router(expenses.router)
+api_router.include_router(expense_people.router)
 api_router.include_router(balances.router)
 api_router.include_router(memories.router)
 api_router.include_router(dashboard.router)

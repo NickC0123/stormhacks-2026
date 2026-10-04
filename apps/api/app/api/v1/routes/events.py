@@ -73,7 +73,7 @@ def create_event(body: EventCreate, user: CurrentUserDep) -> Event:
 
 def get_member_event(repo: EventInvitesRepo, event_id: UUID, user_id: str) -> dict[str, Any]:
     """The event, or 404 if it doesn't exist or the user isn't a member."""
-    event = repo.get_event(str(event_id))
+    event = repo.get_resource(str(event_id))
     if event is None or not repo.is_member(event["id"], user_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found.")
     return event
@@ -86,7 +86,7 @@ def get_event(
     """Event details with members and pending invites. Members only."""
     event = get_member_event(repo, event_id, user.id)
     member_ids = repo.list_member_ids(event["id"])
-    invites = repo.list_event_invites(event["id"])
+    invites = repo.list_resource_invites(event["id"])
     user_ids = {*member_ids}
     for invite in invites:
         user_ids.update((invite["invitee_id"], invite["inviter_id"]))

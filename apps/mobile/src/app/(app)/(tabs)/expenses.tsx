@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { ExpenseInvitations } from '@/components/expenses/ExpenseInvitations';
 import { Screen } from '@/components/ui/Screen';
 import { listExpenses } from '@/lib/expenses';
 import { useTheme } from '@/theme';
@@ -42,6 +43,7 @@ export default function ExpensesScreen() {
       <Pressable accessibilityRole="button" onPress={() => router.push('/expenses/new')} style={{ padding: 14, borderRadius: 10, backgroundColor: theme.colors.accent }}>
         <Text style={{ ...theme.typography.body, color: theme.colors.onAccent }}>New expense</Text>
       </Pressable>
+      <ExpenseInvitations />
       {loading ? <ActivityIndicator /> : null}
       {error ? <Text style={{ color: theme.colors.textPrimary }}>{error}</Text> : null}
       {!loading && !error && expenses.length === 0 ? <Text style={{ color: theme.colors.textSecondary }}>No expenses yet.</Text> : null}
