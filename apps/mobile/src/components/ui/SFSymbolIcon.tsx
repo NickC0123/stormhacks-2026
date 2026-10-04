@@ -52,6 +52,18 @@ export function SFSymbolIcon({ name, size, color }: Props) {
     return <Ionicons name="chevron-down" size={iconSize} color={tint} />;
   }
 
+  if (name === 'arrow.up') {
+    return <Ionicons name="arrow-up" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'arrow.down') {
+    return <Ionicons name="arrow-down" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'arrow.up.arrow.down') {
+    return <Ionicons name="swap-vertical" size={iconSize} color={tint} />;
+  }
+
   if (name === 'checkmark') {
     return <Ionicons name="checkmark" size={iconSize} color={tint} />;
   }
@@ -70,6 +82,10 @@ export function SFSymbolIcon({ name, size, color }: Props) {
 
   if (name === 'square.and.arrow.up') {
     return <Ionicons name="share-outline" size={iconSize} color={tint} />;
+  }
+
+  if (name === 'doc.on.clipboard' || name === 'doc.on.doc') {
+    return <Ionicons name="copy-outline" size={iconSize} color={tint} />;
   }
 
   if (

@@ -1,5 +1,5 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -22,9 +22,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SplitPicker, useSplitDraft } from '@/components/expenses/SplitPicker';
 import { PeopleManager } from '@/components/people/PeopleManager';
+import { BackButton } from '@/components/ui/BackButton';
+import { CircleIconButton } from '@/components/ui/CircleIconButton';
 import { NativeSelect } from '@/components/ui/NativeSelect';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
 import { InlineSnackbar, useSnackbar } from '@/components/ui/Snackbar';
+import { Tabs } from '@/components/ui/Tabs';
 import { useReceiptPicker } from '@/hooks/useReceiptPicker';
 import { attachExpenseReceipt, categoryLabels, deleteExpense, expenseTotal, formatCents, getExpense, itemUnitPrice, lineAmount, getExpenseReceiptUrl, listExpenseEvents, localDate, receiptExpenseFields, receiptTotalMismatch, saveExpense, type ExpenseEvent } from '@/lib/expenses';
 import { scanReceipt } from '@/lib/receipts';
@@ -41,6 +45,13 @@ const validQuantity = (quantity: ExpenseItem['quantity']) => {
 const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Please try again.';
 
 type PickerMode = 'date' | 'time';
+type EditTab = 'split' | 'items' | 'details';
+
+const EDIT_TABS: { value: EditTab; label: string }[] = [
+  { value: 'split', label: 'Equal Split' },
+  { value: 'items', label: 'Items' },
+  { value: 'details', label: 'Details' },
+];
 
 /** Parse `YYYY-MM-DD` as a local calendar date. */
 function parseLocalDate(value: string): Date | null {
@@ -309,6 +320,8 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
   /** Drawer create flow: items/receipt first, then details. */
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  /** Edit flow: equal split, items/total, then details. */
+  const [editTab, setEditTab] = useState<EditTab>('split');
   const [manualEntry, setManualEntry] = useState(false);
   const [scanToast, setScanToast] = useState<string | null>(null);
   const { asset, takePhoto, chooseFromLibrary, clear } = useReceiptPicker();
@@ -587,41 +600,52 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
   if (loadError) return <View style={styles.center}><Text style={styles.text}>{loadError}</Text><Text style={styles.text} onPress={() => router.back()}>Go back</Text></View>;
 
   const isDrawer = !expenseId;
-  // Drawer: items (step 1), details (step 2), then who splits it (step 3). Edit shows details then items.
-  const showDetails = !isDrawer || step === 2;
-  const showItems = !isDrawer || step === 1;
-  const showSplit = isDrawer && step === 3;
+  // Drawer: items (step 1), details (step 2), then who splits it (step 3).
+  // Edit: tabbed Equal Split / Items / Details.
+  const showDetails = isDrawer ? step === 2 : editTab === 'details';
+  const showItems = isDrawer ? step === 1 : editTab === 'items';
+  const showSplit = isDrawer ? step === 3 : editTab === 'split';
   const imageUri = asset?.uri ?? receiptUrl;
   const canContinue = Boolean(totals && totals.total !== 0);
   const canSave = canContinue && form.title.trim().length > 0
     && (!isDrawer || step !== 3 || splitDraft.selectedIds.length > 0);
+  const stickyFooterPad = Math.max(insets.bottom, theme.spacing[3]);
+  const stickyReserve =
+    theme.createActionModal.actionHeight + theme.spacing[3] + theme.spacing[6] + stickyFooterPad;
 
   return (
-    <SafeAreaView style={styles.container} edges={isDrawer ? [] : ['left', 'right']}>
+    <SafeAreaView style={styles.container} edges={isDrawer ? [] : ['top', 'left', 'right']}>
       {isDrawer ? null : (
-        <Stack.Screen
-          options={{
-            headerRight: () => (
-              <Pressable
+        <>
+          <PageHeader
+            title={form.title.trim() || 'Expense'}
+            left={<BackButton />}
+            right={
+              <CircleIconButton
+                accessibilityLabel="Delete expense"
                 onPress={confirmDelete}
                 disabled={busy}
-                hitSlop={theme.spacing[2]}
-                accessibilityRole="button"
-                accessibilityLabel="Delete expense"
-                style={({ pressed }) => (pressed || busy) && styles.primaryCtaDisabled}
               >
-                <SFSymbolIcon name="trash" size={22} color={theme.colors.danger} />
-              </Pressable>
-            ),
-          }}
-        />
+                <SFSymbolIcon name="trash" color={theme.colors.danger} />
+              </CircleIconButton>
+            }
+          />
+          <View style={styles.editTabs}>
+            <Tabs
+              tabs={EDIT_TABS}
+              value={editTab}
+              onChange={setEditTab}
+              accessibilityLabel="Expense sections"
+            />
+          </View>
+        </>
       )}
       <ScrollView
         contentContainerStyle={[
           styles.content,
           isDrawer && styles.drawerContent,
           isDrawer && styles.drawerContentGrow,
-          { paddingBottom: bottomPad },
+          { paddingBottom: isDrawer ? bottomPad : stickyReserve },
         ]}
         keyboardShouldPersistTaps="handled"
       >
@@ -660,7 +684,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
           </View>
         ) : null}
 
-        {/* Edit + drawer step 2: title, date, event (and equal split when editing). */}
+        {/* Edit Details tab + drawer step 2: title, date, event. */}
         {showDetails ? (
           <>
             <Field label="Title" value={form.title} onChangeText={(value) => field('title', value)} styles={styles} editable={!busy} />
@@ -736,22 +760,6 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
                 onChange={(eventId) => field('event_id', eventId || null)}
               />
             </View>
-            {!isDrawer ? (
-              <>
-                <Text style={styles.sectionLabel}>Equal split</Text>
-                <Text style={styles.hint}>
-                  {form.event_id
-                    ? 'Event members are selected by default when you save. You can change the people for this expense.'
-                    : 'Select the people sharing this expense after saving.'}{' '}
-                  Saving expense changes updates the shares.
-                </Text>
-                {savedId ? (
-                  <PeopleManager key={`${savedId}:${splitVersion}`} kind="expense" id={savedId} />
-                ) : (
-                  <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>
-                )}
-              </>
-            ) : null}
           </>
         ) : null}
 
@@ -998,15 +1006,32 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         ) : null}
 
         {showSplit ? (
-          <>
-            <Text style={styles.sectionLabel}>Split With</Text>
-            <SplitPicker
-              draft={splitDraft}
-              totalCents={Math.max(totals?.total ?? 0, 0)}
-              currency={form.currency || 'CAD'}
-              disabled={busy}
-            />
-          </>
+          isDrawer ? (
+            <>
+              <Text style={styles.sectionLabel}>Split With</Text>
+              <SplitPicker
+                draft={splitDraft}
+                totalCents={Math.max(totals?.total ?? 0, 0)}
+                currency={form.currency || 'CAD'}
+                disabled={busy}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionLabel}>Equal split</Text>
+              <Text style={styles.hint}>
+                {form.event_id
+                  ? 'Event members are selected by default when you save. You can change the people for this expense.'
+                  : 'Select the people sharing this expense after saving.'}{' '}
+                Saving expense changes updates the shares.
+              </Text>
+              {savedId ? (
+                <PeopleManager key={`${savedId}:${splitVersion}`} kind="expense" id={savedId} />
+              ) : (
+                <Text style={styles.hint}>Save this expense to add friends or invite people.</Text>
+              )}
+            </>
+          )
         ) : null}
 
         {error ? <Text style={styles.warning}>{error}</Text> : null}
@@ -1119,25 +1144,28 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
             </Pressable>
           </View>
         ) : null}
-        {!isDrawer ? (
-          <View style={styles.ctaDock}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Save expense"
-              accessibilityState={{ disabled: !canSave || busy }}
-              disabled={!canSave || busy}
-              onPress={save}
-              style={({ pressed }) => [
-                styles.primaryCta,
-                pressed && canSave && !busy && styles.primaryCtaPressed,
-                (!canSave || busy) && styles.primaryCtaDisabled,
-              ]}
-            >
-              <Text style={styles.primaryCtaText}>Save expense</Text>
-            </Pressable>
-          </View>
-        ) : null}
       </ScrollView>
+
+      {!isDrawer ? (
+        <View style={[styles.stickyFooter, { paddingBottom: stickyFooterPad }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Save expense"
+            accessibilityState={{ disabled: !canSave || busy, busy }}
+            disabled={!canSave || busy}
+            onPress={save}
+            style={({ pressed }) => [
+              styles.primaryCta,
+              styles.primaryCtaRow,
+              pressed && canSave && !busy && styles.primaryCtaPressed,
+              (!canSave || busy) && styles.primaryCtaDisabled,
+            ]}
+          >
+            {busy ? <ActivityIndicator color={theme.colors.onAccent} /> : null}
+            <Text style={styles.primaryCtaText}>Save expense</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {Platform.OS === 'android' && pickerMode ? (
         <DateTimePicker
@@ -1172,7 +1200,7 @@ export function ExpenseEditor({ expenseId, initialEventId }: { expenseId?: strin
         message={scanToast ?? ''}
         visible={Boolean(scanToast)}
         onHidden={() => setScanToast(null)}
-        bottomOffset={bottomPad + theme.spacing[3]}
+        bottomOffset={(isDrawer ? bottomPad : stickyReserve) + theme.spacing[3]}
       />
     </SafeAreaView>
   );
@@ -1208,6 +1236,17 @@ function createStyles(theme: Theme) {
     container: { flex: 1, backgroundColor: theme.colors.bgSurface },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: theme.colors.bgSurface },
     content: { padding: 20, gap: 12, paddingBottom: 40 },
+    editTabs: {
+      paddingHorizontal: theme.sizes.pagePaddingX,
+      marginBottom: theme.spacing[2],
+    },
+    stickyFooter: {
+      paddingHorizontal: theme.sizes.pagePaddingX,
+      paddingTop: theme.spacing[3],
+      backgroundColor: theme.colors.bgSurface,
+      borderTopWidth: theme.sizes.borderWidth,
+      borderTopColor: theme.colors.borderSubtle,
+    },
     drawerContent: {
       paddingHorizontal: theme.sizes.pagePaddingX,
       paddingTop: theme.spacing[12], // 48

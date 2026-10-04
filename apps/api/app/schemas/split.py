@@ -26,6 +26,10 @@ class BalanceExpense(BaseModel):
     expense_id: UUID
     title: str
     amount: Decimal  # Positive: they owe you. Negative: you owe them.
+    event_id: UUID | None = None
+    event_title: str | None = None
+    event_starts_at: datetime | None = None
+    date: str | None = None
 
 
 class BalanceSettlement(BaseModel):

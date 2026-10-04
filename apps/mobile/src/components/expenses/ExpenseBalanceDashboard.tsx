@@ -1,10 +1,22 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BalanceSectionSkeleton } from '@/components/expenses/ExpenseCardSkeletons';
+import { BottomDrawer } from '@/components/ui/BottomDrawer';
 import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { LoadState } from '@/components/ui/LoadState';
+import { SFSymbolIcon } from '@/components/ui/SFSymbolIcon';
+import { useSnackbar } from '@/components/ui/Snackbar';
 import type { useExpenseBalances } from '@/hooks/useExpenseBalances';
+import {
+  loadPaidChecks,
+  paidStorageKey,
+  prunePaidIds,
+  savePaidChecks,
+  type PaidChecksMap,
+} from '@/lib/balancePaid';
 import { CONTACTS, formatContact } from '@/lib/contacts';
 import { displayName } from '@/lib/events';
 import { formatCents, toCents, unconvertedNote } from '@/lib/expenses';
@@ -13,174 +25,662 @@ import type { BalanceDashboard } from '@/types';
 
 type Props = { balances: ReturnType<typeof useExpenseBalances>; eventOnly?: boolean };
 type Person = BalanceDashboard['people'][number];
+type PersonKey = { userId: string; currency: string };
+
 const cents = (amount: string) => toCents(amount) ?? 0;
 const money = (amount: number, currency: string) => `$${formatCents(Math.abs(amount))} ${currency}`;
+const personKey = (person: Person): PersonKey => ({
+  userId: person.user.id,
+  currency: person.currency,
+});
+const samePerson = (a: PersonKey, b: PersonKey) =>
+  a.userId === b.userId && a.currency === b.currency;
+/** Formats expense `YYYY-MM-DD` (or ISO datetime) in local time. */
+const formatExpenseDate = (value: string) => {
+  const dayPart = value.slice(0, 10);
+  const [year, month, day] = dayPart.split('-').map(Number);
+  if (!year || !month || !day) return value;
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+const metaLine = (expenseCount: number, paidCount: number) =>
+  `${expenseCount} expense${expenseCount === 1 ? '' : 's'} · ${paidCount} paid`;
+
+/** Single shared event title when every expense is on the same event. */
+function sharedEventTitle(person: Person): string | null {
+  const titles = [
+    ...new Set(
+      person.expenses
+        .map((expense) => expense.event_title?.trim())
+        .filter((title): title is string => Boolean(title)),
+    ),
+  ];
+  return titles.length === 1 ? titles[0] : null;
+}
 
 export function ExpenseBalanceDashboard({ balances, eventOnly = false }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const [tab, setTab] = useState<'owed' | 'owing' | 'settled'>('owed');
-  const [visibleCount, setVisibleCount] = useState(5);
-  const [notice, setNotice] = useState('');
+  const { showSnackbar } = useSnackbar();
+  const [selectedKey, setSelectedKey] = useState<PersonKey | null>(null);
+  const [paidByPerson, setPaidByPerson] = useState<PaidChecksMap>({});
   const { data, loading, error, retry } = balances;
-  const owed = data?.people.filter((person) => cents(person.owed_to_you) > 0) ?? [];
-  const owing = data?.people.filter((person) => cents(person.you_owe) > 0) ?? [];
-  const settled = data?.people.filter((person) => !cents(person.you_owe) && !cents(person.owed_to_you)) ?? [];
-  const largestFirst = (field: 'you_owe' | 'owed_to_you') => (a: Person, b: Person) => cents(b[field]) - cents(a[field]);
+  const owed = (data?.people.filter((person) => cents(person.owed_to_you) > 0) ?? []).sort(
+    (a, b) => cents(b.owed_to_you) - cents(a.owed_to_you),
+  );
+  const owing = (data?.people.filter((person) => cents(person.you_owe) > 0) ?? []).sort(
+    (a, b) => cents(b.you_owe) - cents(a.you_owe),
+  );
+  const selected =
+    selectedKey && data
+      ? (data.people.find((person) => samePerson(personKey(person), selectedKey)) ?? null)
+      : null;
 
-  const people = tab === 'owed' ? owed.sort(largestFirst('owed_to_you')) : tab === 'owing' ? owing.sort(largestFirst('you_owe')) : settled;
+  useEffect(() => {
+    void loadPaidChecks().then(setPaidByPerson);
+  }, []);
 
-  return <View style={styles.section}>
-    <Text accessibilityRole="header" style={styles.heading}>{eventOnly ? 'Your event balance' : 'Your balance'}</Text>
-    {eventOnly ? <Text style={styles.caption}>Expenses and recorded payments for this event only.</Text> : null}
-    {loading || error ? <LoadState loading={loading} error={error} fallbackError="Could not load balances." onRetry={retry} /> : null}
-    {data ? <>
-      {(data.totals.length ? data.totals : [{ currency: 'CAD', you_owe: '0.00', owed_to_you: '0.00' }]).map((total) => <View key={total.currency} style={styles.summary}>
-        <View style={[styles.totalCard, { backgroundColor: theme.colors.successSubtle }]}>
-          <Text style={styles.label}>Total owed to you</Text>
-          <Text style={[styles.total, { color: theme.colors.success }]}>{money(cents(total.owed_to_you), total.currency)}</Text>
-          <Text style={styles.caption}>Money to receive</Text>
+  useEffect(() => {
+    if (!data) return;
+    setPaidByPerson((current) => {
+      let changed = false;
+      const next: PaidChecksMap = { ...current };
+      for (const person of data.people) {
+        const key = paidStorageKey(person.user.id, person.currency);
+        const pruned = prunePaidIds(
+          current[key],
+          person.expenses.map((expense) => expense.expense_id),
+        );
+        if (pruned.length !== (current[key]?.length ?? 0)) {
+          changed = true;
+          if (pruned.length) next[key] = pruned;
+          else delete next[key];
+        }
+      }
+      if (changed) void savePaidChecks(next);
+      return changed ? next : current;
+    });
+  }, [data]);
+
+  useEffect(() => {
+    if (selectedKey && data && !selected) setSelectedKey(null);
+  }, [data, selected, selectedKey]);
+
+  const onRecorded = useCallback(
+    async (person: Person) => {
+      const key = paidStorageKey(person.user.id, person.currency);
+      setPaidByPerson((current) => {
+        if (!(key in current)) return current;
+        const next = { ...current };
+        delete next[key];
+        void savePaidChecks(next);
+        return next;
+      });
+      setSelectedKey(null);
+      showSnackbar({
+        message: `Payment with ${displayName(person.user)} recorded.`,
+        variant: 'success',
+        overModal: true,
+      });
+    },
+    [showSnackbar],
+  );
+
+  const onSavePaid = useCallback(
+    async (person: Person, expenseIds: string[]) => {
+      const key = paidStorageKey(person.user.id, person.currency);
+      const pruned = prunePaidIds(
+        expenseIds,
+        person.expenses.map((expense) => expense.expense_id),
+      );
+      setPaidByPerson((current) => {
+        const next = { ...current };
+        if (pruned.length) next[key] = pruned;
+        else delete next[key];
+        void savePaidChecks(next);
+        return next;
+      });
+      setSelectedKey(null);
+      showSnackbar({
+        message: pruned.length
+          ? `Saved ${pruned.length} paid expense${pruned.length === 1 ? '' : 's'} with ${displayName(person.user)}.`
+          : `Cleared paid marks with ${displayName(person.user)}.`,
+        variant: 'success',
+        overModal: true,
+      });
+    },
+    [showSnackbar],
+  );
+
+  function paidCountFor(person: Person) {
+    const key = paidStorageKey(person.user.id, person.currency);
+    return prunePaidIds(
+      paidByPerson[key],
+      person.expenses.map((expense) => expense.expense_id),
+    ).length;
+  }
+
+  return (
+    <View style={styles.section}>
+      {eventOnly ? (
+        <View style={styles.eventOnlyHeader}>
+          <Text accessibilityRole="header" style={styles.subheading}>
+            Your event balance
+          </Text>
+          <Text style={styles.caption}>
+            Expenses and recorded payments for this event only.
+          </Text>
         </View>
-        <View style={[styles.totalCard, { backgroundColor: theme.colors.dangerSubtle }]}>
-          <Text style={styles.label}>Total you owe</Text>
-          <Text style={[styles.total, { color: theme.colors.danger }]}>{money(cents(total.you_owe), total.currency)}</Text>
-          <Text style={styles.caption}>Money to pay back</Text>
-        </View>
-      </View>)}
-      <Text style={styles.caption}>CAD · after offsets and recorded payments</Text>
-      {notice ? <Text accessibilityRole="alert" style={[styles.paymentSummary, { color: theme.colors.success }]}>{notice}</Text> : null}
-      {unconvertedNote(data.unconverted_currencies) ? <Text style={styles.hint}>{unconvertedNote(data.unconverted_currencies)}</Text> : null}
-      <View style={styles.tabs} accessibilityRole="tablist" accessibilityLabel="Balance direction">
-        {([
-          { value: 'owed', label: 'Owes you', count: owed.length, color: theme.colors.success, background: theme.colors.successSubtle },
-          { value: 'owing', label: 'You owe', count: owing.length, color: theme.colors.danger, background: theme.colors.dangerSubtle },
-          { value: 'settled', label: 'Settled', count: settled.length, color: theme.colors.textSecondary, background: theme.colors.bgSurfaceAlt },
-        ] as const).map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: tab === item.value }}
-          onPress={() => { setTab(item.value); setVisibleCount(5); }} style={[styles.tab, tab === item.value && { backgroundColor: item.background, borderColor: item.color }]}>
-          <Text style={[styles.label, { color: item.color }]}>{item.label} ({item.count})</Text>
-        </Pressable>)}
-      </View>
-      <Text accessibilityRole="header" style={styles.subheading}>{tab === 'owed' ? 'Who owes you' : tab === 'owing' ? 'Who you owe' : 'All settled'}</Text>
-      {people.slice(0, visibleCount).map((person) =>
-        <PersonCard key={`${person.user.id}:${person.currency}`} person={person} balances={balances}
-          onRecorded={() => setNotice(`Payment with ${displayName(person.user)} recorded. Your totals are updated.`)} />)}
-      {people.length > visibleCount ? <Button label={`Show more (${people.length - visibleCount})`} variant="ghost" onPress={() => setVisibleCount(visibleCount + 5)} /> : null}
-      {!people.length ? <Text style={styles.empty}>
-        {tab === 'owed' ? 'Nobody owes you money right now.' : tab === 'owing' ? 'You don’t owe anyone money right now.' : 'Recorded payments and settled balances will appear here.'}
-      </Text> : null}
-      <Text style={styles.caption}>Other currencies use approximate CAD exchange rates.</Text>
-    </> : null}
-  </View>;
+      ) : null}
+      {loading || error ? (
+        <LoadState
+          loading={loading}
+          error={error}
+          fallbackError="Could not load balances."
+          onRetry={retry}
+          skeleton={<BalanceSectionSkeleton />}
+        />
+      ) : null}
+      {data ? (
+        <>
+          {unconvertedNote(data.unconverted_currencies) ? (
+            <Text style={styles.hint}>{unconvertedNote(data.unconverted_currencies)}</Text>
+          ) : null}
+
+          <BalanceCarousel
+            title="You Owe"
+            empty="You don’t owe anyone money right now."
+            people={owing}
+            totalCents={owing.reduce((sum, person) => sum + cents(person.you_owe), 0)}
+            totalTone="danger"
+            paidCountFor={paidCountFor}
+            onOpen={(person) => setSelectedKey(personKey(person))}
+            styles={styles}
+          />
+          <BalanceCarousel
+            title="Owes You"
+            empty="Nobody owes you money right now."
+            people={owed}
+            totalCents={owed.reduce((sum, person) => sum + cents(person.owed_to_you), 0)}
+            totalTone="success"
+            paidCountFor={paidCountFor}
+            onOpen={(person) => setSelectedKey(personKey(person))}
+            styles={styles}
+          />
+
+          <BalanceDetailDrawer
+            person={selected}
+            visible={selectedKey != null}
+            savedPaidIds={
+              selected
+                ? prunePaidIds(
+                    paidByPerson[paidStorageKey(selected.user.id, selected.currency)],
+                    selected.expenses.map((expense) => expense.expense_id),
+                  )
+                : []
+            }
+            balances={balances}
+            onClose={() => setSelectedKey(null)}
+            onRecorded={onRecorded}
+            onSavePaid={onSavePaid}
+            styles={styles}
+          />
+        </>
+      ) : null}
+    </View>
+  );
 }
 
-function PersonCard({ person, balances, onRecorded }: { person: Person; balances: Props['balances']; onRecorded: () => void }) {
+type Styles = ReturnType<typeof createStyles>;
+
+function BalanceCarousel({
+  title,
+  empty,
+  people,
+  totalCents,
+  totalTone,
+  paidCountFor,
+  onOpen,
+  styles,
+}: {
+  title: string;
+  empty: string;
+  people: Person[];
+  totalCents: number;
+  totalTone: 'danger' | 'success';
+  paidCountFor: (person: Person) => number;
+  onOpen: (person: Person) => void;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  const totalLabel = `$${formatCents(totalCents)}`;
+  return (
+    <View style={styles.group}>
+      <View style={styles.sectionHeader}>
+        <Text accessibilityRole="header" style={styles.subheading}>
+          {title}
+        </Text>
+        <Text
+          style={[
+            styles.sectionTotal,
+            {
+              color:
+                totalTone === 'danger' ? theme.colors.danger : theme.colors.success,
+            },
+          ]}
+          accessibilityLabel={`${title} total ${totalLabel} CAD`}
+        >
+          {totalLabel}
+        </Text>
+      </View>
+      {people.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          nestedScrollEnabled
+          style={styles.carouselScroll}
+          contentContainerStyle={styles.carousel}
+          accessibilityRole="list"
+          accessibilityLabel={title}
+        >
+          {people.map((person) => (
+            <PersonCard
+              key={`${person.user.id}:${person.currency}`}
+              person={person}
+              paidCount={paidCountFor(person)}
+              onPress={() => onOpen(person)}
+            />
+          ))}
+        </ScrollView>
+      ) : (
+        <Text style={styles.empty}>{empty}</Text>
+      )}
+    </View>
+  );
+}
+
+function PersonCard({
+  person,
+  paidCount,
+  onPress,
+}: {
+  person: Person;
+  paidCount: number;
+  onPress: () => void;
+}) {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const [showPayments, setShowPayments] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const name = displayName(person.user);
   const owe = cents(person.you_owe) > 0;
   const owed = cents(person.owed_to_you) > 0;
   const amount = owe ? person.you_owe : person.owed_to_you;
-  const key = `${person.user.id}:${person.currency}`;
-  const payments = person.settlements.reduce((sum, payment) => sum + cents(payment.amount), 0);
-  async function recordPayment() {
-    const success = await balances.settle(person.user.id, amount, person.currency);
-    if (success) {
-      setConfirming(false);
-      onRecorded();
-    }
-  }
-  const preview = person.expenses.map((expense) => expense.title).slice(0, 2).join(' · ');
+  const eventTitle = sharedEventTitle(person);
+  const meta = metaLine(person.expenses.length, paidCount);
 
-  return <View style={styles.personCard}>
-    <View style={styles.personHeader}>
-      <View style={styles.nameColumn}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.caption}>{owe ? 'You owe them' : owed ? 'They owe you' : 'All settled'}</Text>
-      </View>
-      <Text style={[styles.balanceAmount, { color: owe ? theme.colors.danger : owed ? theme.colors.success : theme.colors.textSecondary }]}>{money(cents(amount), person.currency)}</Text>
-    </View>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.disclosure}>
-      <View style={styles.nameColumn}>
-        <Text numberOfLines={1} style={styles.hint}>{preview || 'Recorded payments'}{person.expenses.length > 2 ? ` · +${person.expenses.length - 2} more` : ''}</Text>
-        <Text style={styles.caption}>{person.expenses.length} expense{person.expenses.length === 1 ? '' : 's'} · {expanded ? 'Hide breakdown' : 'View breakdown'}</Text>
-      </View>
-      <Text style={styles.hint}>{expanded ? '−' : '+'}</Text>
-    </Pressable>
-    {expanded ? <>
-    {person.expenses.length ? <>
-      <Text style={styles.caption}>For these expenses · shares before payments</Text>
-      {person.expenses.map((expense) => {
-        const share = cents(expense.amount);
-        return <Pressable key={expense.expense_id} accessibilityRole="button" accessibilityLabel={`${expense.title}, ${share > 0 ? `${name}’s share` : 'your share'} ${money(share, person.currency)}. View expense.`}
-          onPress={() => router.push({ pathname: '/expenses/[expenseId]', params: { expenseId: expense.expense_id } })} style={styles.expenseRow}>
-          <View style={styles.nameColumn}>
-            <Text style={styles.expenseTitle}>{expense.title}</Text>
-            <Text style={styles.caption}>{share > 0 ? `${name}’s share · you paid` : 'Your share · they paid'}</Text>
-          </View>
-          <View style={styles.amountColumn}>
-            <Text style={[styles.label, { color: share > 0 ? theme.colors.success : theme.colors.danger }]}>{money(share, person.currency)}</Text>
-            <Text style={styles.caption}>View expense ›</Text>
-          </View>
-        </Pressable>;
-      })}
-    </> : null}
-    {person.settlements.length ? <View style={styles.paymentSummary}>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPayments }} onPress={() => setShowPayments(!showPayments)} style={styles.disclosure}>
-        <Text style={[styles.hint, styles.nameColumn]}>Recorded payments{payments ? ` · ${money(payments, person.currency)} ${payments > 0 ? 'paid by you' : 'received'}` : ''}</Text>
-        <Text style={styles.hint}>{showPayments ? '−' : '+'}</Text>
-      </Pressable>
-      {showPayments ? person.settlements.map((payment) => <View key={payment.id} style={styles.expenseRow}>
-        <View style={styles.nameColumn}>
-          <Text style={styles.hint}>{cents(payment.amount) > 0 ? 'You paid them' : 'They paid you'}</Text>
-          <Text style={styles.caption}>{new Date(payment.created_at).toLocaleDateString()}</Text>
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${money(cents(amount), person.currency)}, ${name}, ${meta}${eventTitle ? `, ${eventTitle}` : ''}. View breakdown.`}
+      style={({ pressed }) => [styles.personCard, pressed && styles.personCardPressed]}
+    >
+      <View style={styles.personSummary}>
+        <Text
+          style={[
+            styles.balanceAmount,
+            {
+              color: owe
+                ? theme.colors.danger
+                : owed
+                  ? theme.colors.success
+                  : theme.colors.textSecondary,
+            },
+          ]}
+        >
+          {money(cents(amount), person.currency)}
+        </Text>
+        <View style={styles.personMeta}>
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.eventName}>{meta}</Text>
+          {eventTitle ? (
+            <Text style={styles.eventName} numberOfLines={2}>
+              {eventTitle}
+            </Text>
+          ) : null}
         </View>
-        <Text style={styles.label}>{money(cents(payment.amount), person.currency)}</Text>
-      </View>) : null}
-    </View> : null}
-    {(person.expenses.some((expense) => cents(expense.amount) > 0) && person.expenses.some((expense) => cents(expense.amount) < 0)) || person.settlements.length ? <Text style={styles.hint}>Shares in both directions cancel out. Recorded payments are included in the balance above.</Text> : null}
-    {owe && person.payment_contacts.length ? <View style={styles.paymentSummary}>
-      <Text style={styles.label}>Where to pay {name}</Text>
-      {person.payment_contacts.map((contact) => <Text key={contact.kind} selectable style={styles.hint}>{CONTACTS[contact.kind].label}: {formatContact(contact.kind, contact.value)}</Text>)}
-      <Text style={styles.caption}>Press and hold payment details to copy.</Text>
-    </View> : null}
-    </> : null}
-    {(owe || owed) && !confirming ? <Button label={owe ? 'I’ve paid this' : 'I’ve received this'} variant="secondary" loading={balances.busyIds.has(key)} onPress={() => setConfirming(true)}
-      accessibilityLabel={owe ? `Record payment to ${name}` : `Record payment received from ${name}`} /> : null}
-    {confirming ? <View style={styles.paymentSummary}>
-      <Text style={styles.label}>{owe ? `Have you paid ${name}?` : `Have you received payment from ${name}?`}</Text>
-      <Text style={styles.hint}>Record {money(cents(amount), person.currency)} and clear this balance for both of you.</Text>
-      <Button label={owe ? 'Confirm paid' : 'Confirm received'} loading={balances.busyIds.has(key)} onPress={() => { void recordPayment(); }} />
-      <Button label="Cancel" variant="ghost" disabled={balances.busyIds.has(key)} onPress={() => setConfirming(false)} />
-    </View> : null}
-  </View>;
+      </View>
+    </Pressable>
+  );
+}
+
+function BalanceDetailDrawer({
+  person,
+  visible,
+  savedPaidIds,
+  balances,
+  onClose,
+  onRecorded,
+  onSavePaid,
+  styles,
+}: {
+  person: Person | null;
+  visible: boolean;
+  savedPaidIds: string[];
+  balances: Props['balances'];
+  onClose: () => void;
+  onRecorded: (person: Person) => void;
+  onSavePaid: (person: Person, expenseIds: string[]) => void;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const settling = useRef(false);
+  const cached = useRef<Person | null>(null);
+  if (person) cached.current = person;
+  const active = person ?? cached.current;
+  const amount = active
+    ? cents(active.you_owe) > 0
+      ? active.you_owe
+      : active.owed_to_you
+    : '0';
+  const settleKey = active ? `${active.user.id}:${active.currency}` : '';
+
+  useEffect(() => {
+    if (!visible) {
+      settling.current = false;
+      setSaving(false);
+      return;
+    }
+    setCheckedIds(new Set(savedPaidIds));
+  }, [visible, savedPaidIds]);
+
+  if (!active) return null;
+
+  const name = displayName(active.user);
+  const owe = cents(active.you_owe) > 0;
+  const owed = cents(active.owed_to_you) > 0;
+  const busy = balances.busyIds.has(settleKey);
+  const eventTitle = sharedEventTitle(active);
+
+  async function recordPayment() {
+    if (settling.current || balances.busyIds.has(settleKey)) return;
+    settling.current = true;
+    const success = await balances.settle(active.user.id, amount, active.currency);
+    settling.current = false;
+    if (success) onRecorded(active);
+  }
+
+  function toggleExpense(expenseId: string, next: boolean) {
+    setCheckedIds((current) => {
+      const updated = new Set(current);
+      if (next) updated.add(expenseId);
+      else updated.delete(expenseId);
+      return updated;
+    });
+  }
+
+  function saveChecks() {
+    setSaving(true);
+    onSavePaid(active, [...checkedIds]);
+    setSaving(false);
+  }
+
+  return (
+    <BottomDrawer
+      visible={visible}
+      onClose={onClose}
+      title={money(cents(amount), active.currency)}
+      subtitle={name}
+      details={eventTitle ? [eventTitle] : undefined}
+      accessibilityLabel={`Balance with ${name}`}
+      footer={
+        owe || owed ? (
+          <View style={styles.footerActions}>
+            <Button
+              label={owe ? 'Total Amount Paid' : 'Total Amount Received'}
+              variant="outline"
+              shape="pill"
+              size="lg"
+              fullWidth
+              loading={busy}
+              disabled={saving}
+              onPress={() => {
+                void recordPayment();
+              }}
+              accessibilityLabel={
+                owe
+                  ? `Record total amount paid to ${name}`
+                  : `Record total amount received from ${name}`
+              }
+            />
+            <Button
+              label="Save"
+              shape="pill"
+              size="lg"
+              fullWidth
+              loading={saving}
+              disabled={busy}
+              onPress={saveChecks}
+              accessibilityLabel={`Save paid expenses with ${name}`}
+            />
+          </View>
+        ) : null
+      }
+    >
+      {owe && active.payment_contacts.length ? (
+        <View style={styles.paymentSummary}>
+          {active.payment_contacts.map((contact) => {
+            const value = formatContact(contact.kind, contact.value);
+            const label = CONTACTS[contact.kind].label;
+            return (
+              <View key={contact.kind} style={styles.paymentRow}>
+                <Text style={[styles.hint, styles.paymentValue]} selectable>
+                  {label}: {value}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Copy ${label}`}
+                  hitSlop={theme.spacing[3]}
+                  onPress={() => {
+                    void Clipboard.setStringAsync(value).then(() => {
+                      showSnackbar({
+                        message: 'Copied to clipboard.',
+                        variant: 'success',
+                        overModal: true,
+                      });
+                    });
+                  }}
+                  style={({ pressed }) => [
+                    styles.copyButton,
+                    pressed && styles.copyButtonPressed,
+                  ]}
+                >
+                  <SFSymbolIcon
+                    name="doc.on.doc"
+                    size={theme.sizes.iconMd}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {active.expenses.map((expense) => {
+        const share = cents(expense.amount);
+        const checked = checkedIds.has(expense.expense_id);
+        const dateLabel = expense.date ? formatExpenseDate(expense.date) : null;
+        const inactive = busy || saving;
+        return (
+          <Pressable
+            key={expense.expense_id}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked, disabled: inactive }}
+            accessibilityLabel={`${expense.title}${dateLabel ? `, ${dateLabel}` : ''}, ${money(share, active.currency)}. Mark as ${owe ? 'paid' : 'received'}`}
+            onPress={() => toggleExpense(expense.expense_id, !checked)}
+            disabled={inactive}
+            style={({ pressed }) => [
+              styles.expenseRow,
+              pressed && !inactive && styles.expenseRowPressed,
+            ]}
+          >
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Checkbox
+                checked={checked}
+                onChange={() => {}}
+                accessibilityLabel=""
+              />
+            </View>
+            <View style={styles.expenseBody}>
+              <View style={styles.nameColumn}>
+                <Text style={styles.expenseTitle}>{expense.title}</Text>
+                {dateLabel ? <Text style={styles.caption}>{dateLabel}</Text> : null}
+                {expense.event_title ? (
+                  <Text style={styles.caption} numberOfLines={1}>
+                    {expense.event_title}
+                  </Text>
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  styles.label,
+                  {
+                    color: owe
+                      ? theme.colors.danger
+                      : owed
+                        ? theme.colors.success
+                        : theme.colors.textPrimary,
+                  },
+                ]}
+              >
+                {money(share, active.currency)}
+              </Text>
+            </View>
+          </Pressable>
+        );
+      })}
+    </BottomDrawer>
+  );
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    section: { gap: theme.spacing[3] },
-    heading: { ...theme.typography.h2, color: theme.colors.textPrimary },
-    subheading: { ...theme.typography.h4, color: theme.colors.textPrimary, marginTop: theme.spacing[3] },
-    tabs: { flexDirection: 'row', gap: theme.spacing[2] },
-    tab: { flex: 1, minHeight: theme.sizes.touchTarget, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.borderSubtle, borderRadius: theme.radius.md, padding: theme.spacing[2] },
-    summary: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[3] },
-    totalCard: { flexGrow: 1, flexBasis: 145, padding: theme.spacing[4], borderRadius: theme.radius.lg, gap: theme.spacing[2] },
-    total: { ...theme.typography.h4, fontVariant: ['tabular-nums'] },
+    section: { gap: theme.spacing[6], marginTop: theme.spacing[2] },
+    eventOnlyHeader: { gap: theme.spacing[1] },
+    group: { gap: 0 },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing[3],
+    },
+    subheading: { ...theme.typography.sectionTitle, color: theme.colors.textPrimary, flex: 1 },
+    sectionTotal: {
+      ...theme.typography.sectionTitle,
+      fontVariant: ['tabular-nums'],
+    },
+    carouselScroll: {
+      marginTop: theme.spacing[3],
+      marginHorizontal: -theme.sizes.pagePaddingX,
+    },
+    carousel: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: theme.spacing[3],
+      paddingVertical: theme.spacing[1],
+      paddingHorizontal: theme.sizes.pagePaddingX,
+    },
     label: { ...theme.typography.button, color: theme.colors.textPrimary },
     hint: { ...theme.typography.bodySm, color: theme.colors.textSecondary },
     caption: { ...theme.typography.caption, color: theme.colors.textSecondary },
-    empty: { ...theme.typography.bodySm, color: theme.colors.textSecondary, paddingVertical: theme.spacing[3] },
-    personCard: { padding: theme.spacing[4], gap: theme.spacing[3], borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.bgSurface },
-    personHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: theme.spacing[2], paddingBottom: theme.spacing[2] },
+    empty: {
+      ...theme.typography.bodySm,
+      color: theme.colors.textSecondary,
+      marginTop: theme.spacing[1],
+    },
+    personCard: {
+      width: theme.sizes.balanceCard,
+      padding: theme.spacing[4],
+      gap: theme.spacing[3],
+      borderRadius: theme.radius.xl,
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: theme.colors.borderSubtle,
+      backgroundColor: theme.colors.bgSurface,
+    },
+    personCardPressed: {
+      backgroundColor: theme.colors.bgSurfaceAlt,
+    },
+    personSummary: {
+      gap: theme.spacing[3],
+    },
+    personMeta: {
+      gap: theme.spacing[0.5],
+    },
     nameColumn: { flex: 1, minWidth: 100, gap: theme.spacing[1] },
     name: { ...theme.typography.bodyStrong, color: theme.colors.textPrimary },
+    eventName: { ...theme.typography.bodySm, color: theme.colors.textSecondary },
     balanceAmount: { ...theme.typography.h4, fontVariant: ['tabular-nums'] },
-    expenseRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3], minHeight: theme.sizes.touchTarget, paddingVertical: theme.spacing[2], borderTopWidth: 1, borderTopColor: theme.colors.borderSubtle },
+    expenseRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[1],
+      minHeight: theme.sizes.touchTarget,
+      paddingVertical: theme.spacing[2],
+      paddingHorizontal: theme.spacing[2],
+      marginHorizontal: -theme.spacing[2],
+      borderRadius: theme.radius.md,
+      borderTopWidth: theme.sizes.borderWidth,
+      borderTopColor: theme.colors.borderSubtle,
+    },
+    expenseBody: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[3],
+      minHeight: theme.sizes.touchTarget,
+    },
+    expenseRowPressed: {
+      backgroundColor: theme.colors.bgSurfaceAlt,
+    },
     expenseTitle: { ...theme.typography.body, color: theme.colors.textPrimary },
-    amountColumn: { alignItems: 'flex-end', gap: theme.spacing[1], flexShrink: 1 },
-    paymentSummary: { padding: theme.spacing[3], borderRadius: theme.radius.md, backgroundColor: theme.colors.bgSurfaceAlt, gap: theme.spacing[2] },
-    disclosure: { minHeight: theme.sizes.touchTarget, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing[2] },
+    paymentSummary: {
+      paddingVertical: theme.spacing[2],
+      paddingHorizontal: theme.spacing[3] + theme.spacing[1.5],
+      marginBottom: theme.spacing[2],
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.bgSurfaceAlt,
+      gap: theme.spacing[2],
+    },
+    paymentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing[2],
+    },
+    paymentValue: {
+      flex: 1,
+    },
+    copyButton: {
+      padding: theme.spacing[1],
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radius.md,
+    },
+    copyButtonPressed: {
+      backgroundColor: theme.colors.bgSurface,
+    },
+    footerActions: {
+      gap: theme.spacing[2],
+    },
   });
 }

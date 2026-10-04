@@ -1,5 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EventInvitesAndList } from '@/components/events/EventInvitesAndList';
@@ -24,14 +23,7 @@ function EventsScreenBody() {
   const styles = createStyles(theme);
   const home = useEventsHome();
   const events = home.data?.events ?? [];
-  const [entranceKey, setEntranceKey] = useState(0);
   const notifyReveal = useScrollRevealNotify();
-
-  useFocusEffect(
-    useCallback(() => {
-      setEntranceKey((key) => key + 1);
-    }, []),
-  );
 
   return (
     <Screen
@@ -74,7 +66,6 @@ function EventsScreenBody() {
           <EventMemoryCard
             key={event.id}
             event={event}
-            entranceKey={entranceKey}
             revealOnScroll={index > 0}
             onPress={() =>
               router.push({ pathname: '/events/[eventId]', params: { eventId: event.id } })

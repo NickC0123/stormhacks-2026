@@ -293,7 +293,15 @@ export type BalanceDashboard = {
     currency: string;
     you_owe: string;
     owed_to_you: string;
-    expenses: { expense_id: string; title: string; amount: string }[];
+    expenses: {
+      expense_id: string;
+      title: string;
+      amount: string;
+      event_id?: string | null;
+      event_title?: string | null;
+      event_starts_at?: string | null;
+      date?: string | null;
+    }[];
     /** Recorded payments. Positive: you paid them. Negative: they paid you. */
     settlements: { id: string; amount: string; created_at: string }[];
     /** Their visible e-transfer details, only while you owe them. */
