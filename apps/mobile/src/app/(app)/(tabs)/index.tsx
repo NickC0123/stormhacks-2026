@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { EventInvitesAndList } from '@/components/events/EventInvitesAndList';
 import { EventMemoryCard } from '@/components/events/EventMemoryCard';
@@ -13,6 +13,7 @@ export default function EventsScreen() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const home = useEventsHome();
+  const events = home.data?.events ?? [];
 
   return (
     <Screen
@@ -43,11 +44,18 @@ export default function EventsScreen() {
         <EventInvitesAndList home={home} />
       </View>
 
-      {/* Demo cards until memories are loaded from the API. */}
+      {home.data && events.length === 0 ? (
+        <Text style={styles.empty}>No events yet. Tap + to create one, or ask a friend to invite you.</Text>
+      ) : null}
+
       <View style={styles.cards}>
-        <EventMemoryCard />
-        <EventMemoryCard />
-        <EventMemoryCard />
+        {events.map((event) => (
+          <EventMemoryCard
+            key={event.id}
+            event={event}
+            onPress={() => router.push({ pathname: '/events/[eventId]', params: { eventId: event.id } })}
+          />
+        ))}
       </View>
     </Screen>
   );
@@ -58,10 +66,18 @@ function createStyles(theme: Theme) {
     list: {
       marginTop: theme.spacing[8],
     },
+    empty: {
+      ...theme.typography.body,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      marginTop: theme.spacing[10],
+      paddingHorizontal: theme.spacing[6],
+    },
     cards: {
       flexDirection: 'column',
       gap: theme.spacing[12],
-      marginTop: theme.spacing[10],
+      marginTop: theme.spacing[3],
+      paddingBottom: theme.spacing[12],
     },
   });
 }

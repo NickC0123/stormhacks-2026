@@ -9,6 +9,8 @@ from app.api.v1.routes import events as events_route
 from app.api.v1.routes import expenses as route
 from app.core.auth import CurrentUser, get_current_user
 from app.main import app
+from app.services.event_photos import EventPhotosRepo
+from app.services.friends import FriendsRepo
 
 USER = str(uuid4())
 OTHER = str(uuid4())
@@ -91,10 +93,33 @@ class DB:
         return Query(self, name)
 
 
+class EmptyPhotosRepo(EventPhotosRepo):
+    def __init__(self):
+        pass
+
+    def list_photos_for_events(self, event_ids):
+        return []
+
+    def signed_urls(self, paths):
+        return {}
+
+
+class StubFriendsRepo(FriendsRepo):
+    def __init__(self):
+        pass
+
+    def get_profiles(self, user_ids):
+        return [
+            {"id": user_id, "username": "user", "avatar_color": "blue"} for user_id in user_ids
+        ]
+
+
 @pytest.fixture
 def db(monkeypatch):
     db = DB()
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=USER)
+    app.dependency_overrides[EventPhotosRepo] = EmptyPhotosRepo
+    app.dependency_overrides[FriendsRepo] = StubFriendsRepo
     monkeypatch.setattr(route, "get_supabase", lambda: db)
     monkeypatch.setattr(events_route, "get_supabase", lambda: db)
     yield db

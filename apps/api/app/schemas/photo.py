@@ -10,3 +10,10 @@ class EventPhoto(BaseModel):
     author_id: UUID
     url: str
     created_at: datetime
+
+
+class EventPhotoPreview(BaseModel):
+    """Compact photo used on home event cards."""
+
+    id: UUID
+    url: str

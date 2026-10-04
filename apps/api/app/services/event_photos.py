@@ -27,6 +27,19 @@ class EventPhotosRepo:
             .data
         )
 
+    def list_photos_for_events(self, event_ids: list[str]) -> list[Row]:
+        if not event_ids:
+            return []
+        return (
+            self.db.table("memories")
+            .select("id,event_id,photo_path,created_at")
+            .in_("event_id", event_ids)
+            .not_.is_("photo_path", "null")
+            .order("created_at", desc=True)
+            .execute()
+            .data
+        )
+
     def add_photo(self, event_id: str, author_id: str, path: str) -> Row:
         return (
             self.db.table("memories")

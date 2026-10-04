@@ -425,7 +425,10 @@ export const sizes = {
   avatarMd: 40,
   /** Overlapping member stack on event detail (Figma 38:280, enlarged for touch). */
   avatarStack: 48,
+  /** Smaller facepile on the event detail header. */
+  avatarStackSm: 36,
   avatarStackOverlap: 12,
+  avatarStackSmOverlap: 8,
   avatarStackRing: 3,
   /** Max faces before the +N overflow chip. */
   avatarStackMax: 3,

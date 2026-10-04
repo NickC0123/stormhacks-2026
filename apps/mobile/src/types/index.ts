@@ -161,10 +161,22 @@ export type EventSummary = {
   starts_at: string | null;
 };
 
+export type EventPhotoPreview = {
+  id: UUID;
+  url: string;
+};
+
 export type EventListItem = EventSummary & {
   description: string | null;
   created_by: UUID;
   created_at: string;
+};
+
+/** Home feed event with cover photos and members. */
+export type EventHomeItem = EventListItem & {
+  photo_count: number;
+  preview_photos: EventPhotoPreview[];
+  members: EventUser[];
 };
 
 /** A pending invite as seen by members of the event. */

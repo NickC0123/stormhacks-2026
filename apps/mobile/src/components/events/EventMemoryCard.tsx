@@ -1,59 +1,82 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AvatarStack } from '@/components/ui/AvatarStack';
+import { formatEventDate } from '@/lib/events';
 import { useTheme, type Theme } from '@/theme';
+import type { EventHomeItem } from '@/types';
 
-/** Fixed demo values — wire to real event data later. */
-const TITLE = 'arcade hangout';
-const DATE = 'Jul 5, 2026';
-const MEMORIES_LABEL = '13 Memories';
-const EXTRA_COUNT = '+5';
+type Props = {
+  event: EventHomeItem;
+  onPress: () => void;
+};
 
 /**
  * Event memory preview card from Figma Group 2 (`22:3202`):
  * fanned photo stack, title, date • memories, avatar row.
  */
-export function EventMemoryCard() {
+export function EventMemoryCard({ event, onPress }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const date = formatEventDate(event.starts_at ?? event.created_at);
+  const memoryCount = event.photo_count;
+  const memoriesLabel =
+    memoryCount === 1 ? '1 Memory' : `${memoryCount} Memories`;
+  const photos = event.preview_photos.slice(0, 3);
+  // Fan order: back-right, back-left, front — front gets the first (fav/latest) photo.
+  const slots = [
+    { key: 'backRight', wrap: styles.photoBackRight, tilt: styles.photoTiltRight, photo: photos[2] },
+    { key: 'backLeft', wrap: styles.photoBackLeft, tilt: styles.photoTiltLeft, photo: photos[1] },
+    { key: 'front', wrap: styles.photoFront, tilt: styles.photoTiltFront, photo: photos[0] },
+  ] as const;
+  const label = `${event.title}, ${date}, ${memoriesLabel}`;
 
   return (
-    <View style={styles.root} accessibilityLabel={`${TITLE}, ${DATE}, ${MEMORIES_LABEL}`}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Opens event"
+      style={({ pressed }) => [styles.root, pressed && styles.pressed]}
+    >
       <View style={styles.stack}>
-        <View style={[styles.photoWrap, styles.photoBackRight]}>
-          <View style={[styles.photo, styles.photoTiltRight]} />
-        </View>
-        <View style={[styles.photoWrap, styles.photoBackLeft]}>
-          <View style={[styles.photo, styles.photoTiltLeft]} />
-        </View>
-        <View style={[styles.photoWrap, styles.photoFront]}>
-          <View style={[styles.photo, styles.photoTiltFront]} />
-        </View>
+        {slots.map((slot) => (
+          <View key={slot.key} style={[styles.photoWrap, slot.wrap]}>
+            <View style={[styles.photo, slot.tilt]}>
+              {slot.photo ? (
+                <Image source={{ uri: slot.photo.url }} style={styles.photoImage} />
+              ) : null}
+            </View>
+          </View>
+        ))}
       </View>
 
-      <Text style={styles.title}>{TITLE}</Text>
+      <Text style={styles.title}>{event.title}</Text>
 
       <View style={styles.meta}>
-        <Text style={styles.metaText}>{DATE}</Text>
+        <Text style={styles.metaText}>{date}</Text>
         <View style={styles.dot} />
-        <Text style={styles.metaText}>{MEMORIES_LABEL}</Text>
+        <Text style={styles.metaText}>{memoriesLabel}</Text>
       </View>
 
-      <View style={styles.avatars}>
-        <View style={[styles.avatar, styles.avatarOverlap]} />
-        <View style={[styles.avatar, styles.avatarOverlap]} />
-        <View style={[styles.avatar, styles.avatarOverlap]} />
-        <View style={[styles.avatar, styles.avatarMore]}>
-          <Text style={styles.avatarMoreLabel}>{EXTRA_COUNT}</Text>
-        </View>
-      </View>
-    </View>
+      <AvatarStack
+        size="sm"
+        align="center"
+        people={event.members.map((member) => ({
+          id: member.id,
+          name: member.username ?? '?',
+          color: member.avatar_color,
+        }))}
+        onPress={onPress}
+        accessibilityLabel={`${event.members.length} members`}
+        accessibilityHint="Opens event"
+      />
+    </Pressable>
   );
 }
 
 function createStyles(theme: Theme) {
   const photoFill = theme.colors.bgSurfaceAlt;
   const photoBorder = theme.colors.bgSurface;
-  const avatarBorder = theme.colors.bgPage;
 
   // Fan bounding box from Figma (~0 → 361). Center that box on the page.
   const fanWidth = 361;
@@ -62,6 +85,9 @@ function createStyles(theme: Theme) {
     root: {
       width: '100%',
       alignItems: 'center',
+    },
+    pressed: {
+      opacity: 0.9,
     },
     stack: {
       width: fanWidth,
@@ -103,7 +129,12 @@ function createStyles(theme: Theme) {
       borderWidth: 4,
       borderColor: photoBorder,
       backgroundColor: photoFill,
+      overflow: 'hidden',
       ...theme.shadows.card,
+    },
+    photoImage: {
+      width: '100%',
+      height: '100%',
     },
     photoTiltLeft: {
       transform: [{ rotate: '-12deg' }],
@@ -143,34 +174,6 @@ function createStyles(theme: Theme) {
       height: 3,
       borderRadius: theme.radius.full,
       backgroundColor: theme.colors.textPrimary,
-    },
-    avatars: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    avatar: {
-      width: 36,
-      height: 36,
-      borderRadius: theme.radius.full,
-      borderWidth: 3,
-      borderColor: avatarBorder,
-      backgroundColor: photoFill,
-    },
-    avatarOverlap: {
-      marginRight: -8,
-    },
-    avatarMore: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 0,
-    },
-    avatarMoreLabel: {
-      fontFamily: theme.fonts.sans.medium,
-      fontSize: 12,
-      lineHeight: 15,
-      letterSpacing: 12 * -0.02,
-      color: theme.colors.textPrimary,
-      textAlign: 'center',
     },
   });
 }

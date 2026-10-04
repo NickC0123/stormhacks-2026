@@ -7,18 +7,43 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.auth import CurrentUserDep
 from app.core.config import get_settings
 from app.db.supabase import get_supabase
-from app.schemas.event import Event, EventCreate
+from app.schemas.event import Event, EventCreate, EventHomeItem
 from app.schemas.invite import EventDetail, EventInvite, EventUser
+from app.schemas.photo import EventPhotoPreview
 from app.services.event_invites import EventInvitesRepo, EventInvitesRepoDep
+from app.services.event_photos import EventPhotosRepoDep
 from app.services.friends import FriendsRepoDep
 from app.services.storage import remove_files
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/events", tags=["events"])
 
+PREVIEW_PHOTO_LIMIT = 3
 
-@router.get("", response_model=list[Event])
-def list_events(user: CurrentUserDep) -> list[Event]:
+
+def pick_preview_photos(
+    event_photos: list[dict[str, Any]],
+    urls: dict[str, str],
+    *,
+    limit: int = PREVIEW_PHOTO_LIMIT,
+) -> list[EventPhotoPreview]:
+    """Latest photos first. Skip missing files."""
+    previews: list[EventPhotoPreview] = []
+    for row in event_photos:  # already newest-first
+        path = row.get("photo_path")
+        if not path or path not in urls:
+            continue
+        previews.append(EventPhotoPreview(id=row["id"], url=urls[path]))
+        if len(previews) >= limit:
+            break
+    return previews
+
+
+@router.get("", response_model=list[EventHomeItem])
+def list_events(
+    user: CurrentUserDep, photos: EventPhotosRepoDep, friends: FriendsRepoDep
+) -> list[EventHomeItem]:
+    """Events the user is in, with members and up to 3 cover photos."""
     db = get_supabase()
     owned = db.table("events").select("*").eq("created_by", user.id).execute().data
     memberships = db.table("event_members").select("event_id").eq("user_id", user.id).execute().data
@@ -32,9 +57,45 @@ def list_events(user: CurrentUserDep) -> list[Event]:
             .data
         )
     rows = {row["id"]: row for row in [*owned, *member_events]}
+    events = sorted(rows.values(), key=lambda row: row["created_at"], reverse=True)
+    event_ids = [row["id"] for row in events]
+    if not event_ids:
+        return []
+
+    member_rows = (
+        db.table("event_members").select("event_id,user_id").in_("event_id", event_ids).execute().data
+    )
+    members_by_event: dict[str, list[str]] = {event_id: [] for event_id in event_ids}
+    profile_ids: set[str] = set()
+    for row in member_rows:
+        members_by_event.setdefault(row["event_id"], []).append(row["user_id"])
+        profile_ids.add(row["user_id"])
+    profiles = {p["id"]: p for p in friends.get_profiles(list(profile_ids))}
+
+    photo_rows = photos.list_photos_for_events(event_ids)
+    photos_by_event: dict[str, list[dict[str, Any]]] = {event_id: [] for event_id in event_ids}
+    for row in photo_rows:
+        photos_by_event.setdefault(row["event_id"], []).append(row)
+
+    paths = [row["photo_path"] for row in photo_rows if row.get("photo_path")]
+    urls = photos.signed_urls(paths)
+
     return [
-        Event(**row)
-        for row in sorted(rows.values(), key=lambda row: row["created_at"], reverse=True)
+        EventHomeItem(
+            id=event["id"],
+            title=event["title"],
+            description=event.get("description"),
+            starts_at=event.get("starts_at"),
+            created_by=event["created_by"],
+            created_at=event["created_at"],
+            photo_count=len(photos_by_event.get(event["id"], [])),
+            preview_photos=pick_preview_photos(photos_by_event.get(event["id"], []), urls),
+            members=[
+                EventUser.lookup(profiles, member_id)
+                for member_id in members_by_event.get(event["id"], [])
+            ],
+        )
+        for event in events
     ]
 
 
