@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { useTheme, type Theme } from '@/theme';
@@ -9,27 +9,51 @@ type Props = {
   subtitle?: string;
   /** Buttons shown on the trailing edge; wraps below the name on narrow screens. */
   actions?: ReactNode;
+  /** Makes the name tappable, e.g. to open their profile. */
+  onPress?: () => void;
 };
 
-export function FriendRow({ username, subtitle, actions }: Props) {
+export function FriendRow({ username, subtitle, actions, onPress }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const [focused, setFocused] = useState(false);
+  const label = subtitle ? `@${username}, ${subtitle}` : `@${username}`;
+  const identity = (
+    <>
+      <Avatar name={username} />
+      <View style={styles.text}>
+        <Text style={styles.username} numberOfLines={1}>
+          @{username}
+        </Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.row}>
-      <View
-        style={styles.identity}
-        accessible
-        accessibilityLabel={subtitle ? `@${username}, ${subtitle}` : `@${username}`}
-      >
-        <Avatar name={username} />
-        <View style={styles.text}>
-          <Text style={styles.username} numberOfLines={1}>
-            @{username}
-          </Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      {onPress ? (
+        <Pressable
+          onPress={onPress}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityHint="Opens their profile"
+          style={({ pressed }) => [
+            styles.identity,
+            styles.pressable,
+            pressed && styles.pressed,
+            focused && styles.focused,
+          ]}
+        >
+          {identity}
+        </Pressable>
+      ) : (
+        <View style={styles.identity} accessible accessibilityLabel={label}>
+          {identity}
         </View>
-      </View>
+      )}
       {actions ? <View style={styles.actions}>{actions}</View> : null}
     </View>
   );
@@ -54,6 +78,18 @@ function createStyles(theme: Theme) {
       flexGrow: 1,
       flexShrink: 1,
       minWidth: '50%',
+    },
+    pressable: {
+      minHeight: theme.sizes.touchTarget,
+      borderRadius: theme.radius.md,
+      borderWidth: theme.sizes.borderWidth,
+      borderColor: 'transparent',
+    },
+    pressed: {
+      backgroundColor: theme.colors.bgSurfaceAlt,
+    },
+    focused: {
+      borderColor: theme.colors.borderFocus,
     },
     text: {
       flexShrink: 1,

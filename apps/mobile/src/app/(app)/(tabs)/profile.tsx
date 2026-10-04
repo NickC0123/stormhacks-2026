@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { FriendsSection } from '@/components/friends/FriendsSection';
+import { ContactsSection } from '@/components/profile/ContactsSection';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { useFriends } from '@/hooks/useFriends';
@@ -30,6 +31,8 @@ export default function ProfileScreen() {
     >
       <View style={styles.content}>
         <FriendsSection friends={friends} />
+
+        <ContactsSection />
 
         <View style={styles.account}>
           {session?.user.email ? (

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
@@ -100,6 +101,7 @@ export function FriendsSection({ friends }: Props) {
             <FriendRow
               key={friend.id}
               username={friend.user.username}
+              onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: friend.user.id } })}
               actions={
                 <Button
                   label="Remove"

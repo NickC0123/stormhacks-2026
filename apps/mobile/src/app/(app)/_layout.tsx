@@ -52,6 +52,7 @@ function AppNavigator() {
         />
         <Stack.Screen name="expenses/new" options={{ headerShown: true, title: 'New expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="users/[userId]" options={{ headerShown: true, title: 'Profile', headerBackTitle: 'Back' }} />
         <Stack.Screen name="events/[eventId]/index" options={{ headerShown: true, title: 'Event', headerBackTitle: 'Back' }} />
         <Stack.Screen
           name="events/[eventId]/invite"
