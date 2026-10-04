@@ -12,7 +12,7 @@ from app.schemas.profile import (
 HANDLE_PATTERN = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 FACEBOOK_PATTERN = re.compile(r"^[A-Za-z0-9.]{5,50}$")
 FACEBOOK_URL_PREFIX = re.compile(r"^(https?://)?(www\.|m\.)?facebook\.com/", re.IGNORECASE)
-PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9 ()-]{5,22}[0-9]$")
+PHONE_CHARS = re.compile(r"^[0-9 +().-]+$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MAX_LENGTH = 100
 
@@ -25,6 +25,16 @@ LABELS: dict[ContactKind, str] = {
 }
 
 Row = dict[str, Any]
+
+
+def normalize_phone(raw: str, label: str) -> str:
+    """Format a North American number as "+1 (604) 555-0123", with or without the 1."""
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if not PHONE_CHARS.fullmatch(raw) or len(digits) != 10:
+        raise ValueError(f"{label} must be a 10-digit +1 number, like (604) 555-0123.")
+    return f"+1 ({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
 
 def normalize_contact(kind: ContactKind, raw: str | None) -> str | None:
@@ -47,8 +57,7 @@ def normalize_contact(kind: ContactKind, raw: str | None) -> str | None:
         if not FACEBOOK_PATTERN.fullmatch(value):
             raise ValueError(f"{label} usernames are 5-50 letters, numbers, or periods.")
     elif kind in ("whatsapp", "etransfer_phone"):
-        if not PHONE_PATTERN.fullmatch(value):
-            raise ValueError(f"{label} must be a phone number, like +1 604 555 0123.")
+        value = normalize_phone(value, label)
     elif len(value) > MAX_LENGTH or not EMAIL_PATTERN.fullmatch(value):
         raise ValueError(f"{label} must be an email address.")
     return value

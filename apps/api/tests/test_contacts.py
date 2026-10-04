@@ -82,7 +82,19 @@ def test_invalid_values_are_rejected(repo: ContactsRepo) -> None:
     assert save({"kind": "facebook", "value": "abc"}).status_code == 422
     assert save({"kind": "etransfer_email", "value": "nope"}).status_code == 422
     assert save({"kind": "etransfer_phone", "value": "call me"}).status_code == 422
-    assert save({"kind": "etransfer_phone", "value": "+1 (604) 555-0123"}).status_code == 200
+    assert save({"kind": "etransfer_phone", "value": "604 555 012"}).status_code == 422
+    assert save({"kind": "etransfer_phone", "value": "+44 20 7946 0958"}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "raw", ["6045550123", "(604) 555-0123", "+1 604-555-0123", "1.604.555.0123"]
+)
+def test_phone_numbers_use_one_format(repo: ContactsRepo, raw: str) -> None:
+    res = save({"kind": "whatsapp", "value": raw}, {"kind": "etransfer_phone", "value": raw})
+    assert res.status_code == 200
+    by_kind = {c["kind"]: c["value"] for c in res.json()["contacts"]}
+    assert by_kind["whatsapp"] == "+1 (604) 555-0123"
+    assert by_kind["etransfer_phone"] == "+1 (604) 555-0123"
 
 
 def test_only_friends_and_event_mates_can_view(repo: ContactsRepo) -> None:

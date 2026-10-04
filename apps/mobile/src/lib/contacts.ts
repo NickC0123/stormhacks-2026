@@ -7,6 +7,8 @@ type ContactMeta = {
   /** Shown before the value, both in the input and on profiles, e.g. "@". */
   prefix?: string;
   keyboardType: 'default' | 'email-address' | 'phone-pad';
+  /** +1 phone number, saved as "+1 (604) 555-0123". */
+  phone?: boolean;
   /** Link that opens the contact in its app, if there is one. */
   url?: (value: string) => string;
 };
@@ -29,8 +31,9 @@ export const CONTACTS: Record<ContactKind, ContactMeta> = {
   },
   whatsapp: {
     label: 'WhatsApp',
-    placeholder: '+1 604 555 0123',
+    placeholder: '(604) 555-0123',
     keyboardType: 'phone-pad',
+    phone: true,
     url: (value) => `https://wa.me/${value.replace(/\D/g, '')}`,
   },
   etransfer_email: {
@@ -40,10 +43,24 @@ export const CONTACTS: Record<ContactKind, ContactMeta> = {
   },
   etransfer_phone: {
     label: 'E-transfer phone',
-    placeholder: '+1 604 555 0123',
+    placeholder: '(604) 555-0123',
     keyboardType: 'phone-pad',
+    phone: true,
   },
 };
+
+/**
+ * Formats a +1 number as the user types: "604" → "(604", "6045550123" → "(604) 555-0123".
+ * A leading 1 is the country code (area codes never start with 1), so it's dropped.
+ * Must match `normalize_phone` in apps/api/app/services/contacts.py.
+ */
+export function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').replace(/^1/, '').slice(0, 10);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 export function formatContact(kind: ContactKind, value: string): string {
   return `${CONTACTS[kind].prefix ?? ''}${value}`;

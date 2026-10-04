@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadState } from '@/components/ui/LoadState';
 import { SwitchRow } from '@/components/ui/SwitchRow';
 import { TextField } from '@/components/ui/TextField';
-import { CONTACTS, getMyContacts, saveMyContacts } from '@/lib/contacts';
+import { CONTACTS, formatPhoneInput, getMyContacts, saveMyContacts } from '@/lib/contacts';
 import { useTheme, type Theme } from '@/theme';
 import type { ContactKind, ContactSetting } from '@/types';
 
@@ -64,6 +64,27 @@ export function ContactsSection() {
     }
   }
 
+  /** Flipping a switch saves that field right away, leaving other unsaved edits alone. */
+  async function toggleVisible(kind: ContactKind, visible: boolean) {
+    if (!saved) return;
+    const field = draft.find((c) => c.kind === kind);
+    const next = saved.map((c) => (c.kind === kind ? { ...c, value: field?.value ?? null, visible } : c));
+    update(kind, { visible });
+    setSaving(true);
+    try {
+      const { contacts } = await saveMyContacts(next);
+      const savedField = contacts.find((c) => c.kind === kind);
+      setSaved(contacts);
+      setDraft((current) => current.map((c) => (c.kind === kind && savedField ? savedField : c)));
+      setNotice(`${CONTACTS[kind].label} is now ${visible ? 'shown' : 'hidden'}.`);
+    } catch (err) {
+      update(kind, { visible: !visible });
+      setSaveError(err instanceof Error ? err.message : 'Could not save your contact info.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   let body: ReactNode;
   if (!saved) {
     body = (
@@ -85,23 +106,24 @@ export function ContactsSection() {
             <View key={contact.kind} style={styles.field}>
               <TextField
                 label={meta.label}
-                prefix={meta.prefix}
-                value={contact.value ?? ''}
-                onChangeText={(text) =>
-                  update(contact.kind, { value: text, visible: text.trim() ? contact.visible : false })
-                }
+                prefix={meta.phone ? '+1' : meta.prefix}
+                value={meta.phone ? formatPhoneInput(contact.value ?? '') : (contact.value ?? '')}
+                onChangeText={(raw) => {
+                  const text = meta.phone ? formatPhoneInput(raw) : raw;
+                  update(contact.kind, { value: text, visible: text.trim() ? contact.visible : false });
+                }}
                 placeholder={meta.placeholder}
                 keyboardType={meta.keyboardType}
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="off"
-                maxLength={100}
+                maxLength={meta.phone ? 14 : 100}
                 disabled={saving}
               />
               <SwitchRow
                 label="Show to friends and event members"
                 value={hasValue && contact.visible}
-                onValueChange={(visible) => update(contact.kind, { visible })}
+                onValueChange={(visible) => toggleVisible(contact.kind, visible)}
                 disabled={saving || !hasValue}
                 accessibilityLabel={`Show ${meta.label} to friends and event members`}
               />
