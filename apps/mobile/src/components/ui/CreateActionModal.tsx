@@ -18,7 +18,10 @@ type Props = {
   onClose: () => void;
 };
 
-/** Centered create chooser — Figma alert: Add Event / New Expense. */
+/**
+ * Centered create chooser — Figma alert: Add Event / New Expense.
+ * Open/close: transitions.dev panel reveal (translateY + fade).
+ */
 export function CreateActionModal({ visible, onClose }: Props) {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -107,9 +110,12 @@ export function CreateActionModal({ visible, onClose }: Props) {
     router.push('/expenses/new');
   }
 
-  const scale = progress.interpolate({
+  const translateY = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [theme.motion.modal.scale, 1],
+    outputRange: [
+      theme.motion.modal.panelHeight * theme.motion.modal.translateYRatio,
+      0,
+    ],
   });
 
   return (
@@ -134,7 +140,7 @@ export function CreateActionModal({ visible, onClose }: Props) {
             styles.card,
             {
               opacity: progress,
-              transform: [{ scale }],
+              transform: [{ translateY }],
             },
           ]}
           accessibilityViewIsModal

@@ -16,6 +16,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 
+import { SnackbarProvider } from '@/components/ui/Snackbar';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ThemeProvider } from '@/theme';
 
@@ -43,8 +44,10 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <RootNavigator />
-        <StatusBar style="auto" />
+        <SnackbarProvider>
+          <RootNavigator />
+          <StatusBar style="auto" />
+        </SnackbarProvider>
       </AuthProvider>
     </ThemeProvider>
   );

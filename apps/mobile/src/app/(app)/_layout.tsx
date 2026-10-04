@@ -42,7 +42,14 @@ function AppNavigator() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={hasUsername}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="events/new" options={{ presentation: 'modal', headerShown: true, title: 'New event' }} />
+        <Stack.Screen
+          name="events/new"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.bgSurface },
+          }}
+        />
         <Stack.Screen name="expenses/new" options={{ headerShown: true, title: 'New expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="expenses/[expenseId]" options={{ headerShown: true, title: 'Expense', headerBackTitle: 'Back' }} />
         <Stack.Screen name="events/[eventId]/index" />

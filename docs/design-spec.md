@@ -553,6 +553,8 @@ Height `1.5rem`, padding-inline `--space-2`, font `--text-xs` medium, radius `--
 ### 6.9 Toast / Notification
 Width `min(24rem, 100% - 2 * var(--space-4))`, bottom-right (top-center on mobile), `--z-toast`, stack gap `--space-2`. bg `--color-bg-elevated`, border `--color-border-subtle`, `--shadow-lg`, `--radius-lg`, padding `--space-4`. Left status icon (success/warning/danger/info colors). Auto-dismiss 5s (errors: persist until dismissed). `role="status"` (errors: `role="alert"`), pause timer on hover/focus.
 
+**Success snackbar (mobile, Figma `22:3938`):** opaque mint surface `#D1FAE5`, emerald text/icon `#047857`, Inter medium 16 / −3% tracking, 16×12 padding, 10 gap, 4 radius, checkmark 24. Sits above the floating bottom nav. Open/close uses transitions.dev toast (350ms / 250ms, rise 16, scale 0.97); see `motion.toast` + `snackbar` in theme tokens.
+
 ### 6.10 Tabs
 Tablist border-bottom `--color-border-subtle`. Tab: height `--size-control-md`, padding-inline `--space-4`, `label` type, color `--color-text-secondary`. Hover: `--color-text-primary`. Selected: `--color-text-primary` and 2px bottom indicator `--color-accent-strong`. Arrow-key navigation, `role="tablist|tab|tabpanel"`, roving `tabindex`.
 
@@ -580,7 +582,7 @@ Source: Figma `stormhacks-designin` / Alert on Frame iPhone 17 - 5. Centered cho
 - Centered dialog over a dimmed overlay (tap outside to dismiss).
 - Title: “What would you like to add?”
 - Stacked actions: **Add Event** → `/events/new`, **New Expense** → add-receipt scan (same as event “Add receipt”).
-- Open/close uses the transitions.dev modal scale + fade (see `motion.modal` in theme tokens).
+- Open/close uses the transitions.dev panel reveal: translateY + opacity (+ blur where supported); see `motion.modal` in theme tokens.
 
 ### 6.13 Table
 Header: `overline`-style or `label`, bg `--color-bg-surface-alt`, sticky optional. Cell padding `--space-3 var(--space-4)`, `body-sm`, row border-bottom `--color-border-subtle`. Row hover bg `--color-bg-surface-alt`. Numeric columns right-aligned with `font-variant-numeric: tabular-nums`. Wrap in a horizontally scrollable container on small screens. Provide empty and loading (skeleton) states.
